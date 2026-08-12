@@ -33,7 +33,8 @@ class RepositoryTests {
     @Test
     void saveAndFindMovie() {
         Movie movie = new Movie();
-        movie.setDescription("Test movie");
+        movie.setTitle("Test Movie");
+        movie.setDescription("A test movie");
         movie.setDurationInMinutes(120);
 
         Movie saved = movieRepository.save(movie);
@@ -42,18 +43,21 @@ class RepositoryTests {
 
         Movie found = movieRepository.findById(saved.getId()).orElseThrow();
 
-        assertEquals("Test movie", found.getDescription());
+        assertEquals("Test Movie", found.getTitle());
+        assertEquals("A test movie", found.getDescription());
         assertEquals(120, found.getDurationInMinutes());
     }
 
     @Test
     void findAllMovies() {
         Movie first = new Movie();
-        first.setDescription("First movie");
+        first.setTitle("First movie");
+        first.setDescription("The first movie");
         first.setDurationInMinutes(100);
 
         Movie second = new Movie();
-        second.setDescription("Second movie");
+        second.setTitle("Second movie");
+        second.setDescription("The second movie");
         second.setDurationInMinutes(120);
 
         movieRepository.save(first);
@@ -69,7 +73,8 @@ class RepositoryTests {
     @Test
     void existsById() {
         Movie movie = new Movie();
-        movie.setDescription("Test movie");
+        movie.setTitle("Test movie");
+        movie.setDescription("A test movie");
         movie.setDurationInMinutes(120);
 
         Movie saved = movieRepository.save(movie);
@@ -81,7 +86,8 @@ class RepositoryTests {
     @Test
     void deleteById() {
         Movie movie = new Movie();
-        movie.setDescription("Test movie");
+        movie.setTitle("Test movie");
+        movie.setDescription("A test movie");
         movie.setDurationInMinutes(120);
 
         Movie saved = movieRepository.save(movie);
@@ -96,7 +102,8 @@ class RepositoryTests {
     @Test
     void saveAndFindScreeningWithRelationships() {
         Movie movie = new Movie();
-        movie.setDescription("Test movie");
+        movie.setTitle("Test movie");
+        movie.setDescription("A test movie");
         movie.setDurationInMinutes(120);
         movie = movieRepository.save(movie);
 

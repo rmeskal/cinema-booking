@@ -1,6 +1,7 @@
 package com.rayan.cinemaapi.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -13,6 +14,10 @@ public class Movie {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @NotBlank
+    @Column(nullable = false)
+    private String title;
 
     private String description;
 
@@ -64,5 +69,13 @@ public class Movie {
 
     public void setScreenings(Set<Screening> screenings) {
         this.screenings = screenings;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 }
