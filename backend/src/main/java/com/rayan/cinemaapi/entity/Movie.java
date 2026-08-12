@@ -1,7 +1,6 @@
 package com.rayan.cinemaapi.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -24,7 +23,7 @@ public class Movie {
 
     private String thumbnailUrl;
 
-    @OneToMany(mappedBy = "movie")
+    @OneToMany(mappedBy = "movie", fetch = FetchType.LAZY)
     private Set<Screening> screenings;
 
     public Long getId() {

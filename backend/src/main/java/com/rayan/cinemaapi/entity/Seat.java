@@ -12,13 +12,13 @@ public class Seat {
     @EmbeddedId
     private SeatId seatId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("roomId")
     @NotNull
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
-    @OneToMany(mappedBy = "seat")
+    @OneToMany(mappedBy = "seat", fetch = FetchType.LAZY)
     private Set<Booking> bookings;
 
     public SeatId getSeatId() {

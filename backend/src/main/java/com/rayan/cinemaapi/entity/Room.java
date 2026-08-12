@@ -13,15 +13,15 @@ public class Room {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @NotNull
     @JoinColumn(name = "room_type_id", nullable = false)
     private RoomType roomType;
 
-    @OneToMany(mappedBy = "room")
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Seat> seats;
 
-    @OneToMany(mappedBy = "room")
+    @OneToMany(mappedBy = "room", fetch = FetchType.LAZY)
     private Set<Screening> screenings;
 
     public Long getId() {

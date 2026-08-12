@@ -27,7 +27,7 @@ public class User {
     @Email
     private String email;
 
-    @OneToMany(mappedBy = "user")
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private Set<Booking> bookings;
 
     public Long getId() {

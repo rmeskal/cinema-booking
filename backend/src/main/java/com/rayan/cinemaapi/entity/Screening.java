@@ -15,24 +15,22 @@ import java.util.Set;
         name = "screenings"
 )
 
-// TODO: make it so screenings in same room don't overlap
-
 public class Screening {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="movie_id", nullable = false)
     @NotNull
     private Movie movie;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="room_id", nullable = false)
     @NotNull
     private Room room;
 
-    @OneToMany(mappedBy = "screening")
+    @OneToMany(mappedBy = "screening", fetch = FetchType.LAZY)
     private Set<Booking> bookings;
 
     @NotNull

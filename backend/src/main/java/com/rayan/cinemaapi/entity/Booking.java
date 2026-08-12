@@ -17,17 +17,17 @@ public class Booking {
     private Long id;
 
     @NotNull
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="screening_id", nullable = false)
     private Screening screening;
 
     @NotNull
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="user_id", nullable = false)
     private User user;
 
     @NotNull
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
             @JoinColumn(name = "seat_label", referencedColumnName = "seat_label", nullable = false),
             @JoinColumn(name = "room_id", referencedColumnName = "room_id", nullable = false)
