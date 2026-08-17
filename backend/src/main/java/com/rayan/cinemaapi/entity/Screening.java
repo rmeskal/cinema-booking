@@ -42,6 +42,11 @@ public class Screening {
     @Column(nullable = false)
     private Integer priceInCents;
 
+    @Transient
+    public LocalDateTime getEndTime() {
+        return startTime.plusMinutes(movie.getDurationInMinutes());
+    }
+
     public Long getId() {
         return id;
     }
