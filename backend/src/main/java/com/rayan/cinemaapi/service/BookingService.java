@@ -41,6 +41,12 @@ public class BookingService {
     public Booking updateBooking(Booking booking) {
         Booking existingBooking = getBooking(booking.getId());
 
+        if (!Objects.equals(
+                booking.getScreening().getRoom().getId(),
+                booking.getSeat().getRoom().getId())) {
+            throw new InvalidBookingException();
+        }
+
         existingBooking.setUser(booking.getUser());
         existingBooking.setScreening(booking.getScreening());
         existingBooking.setSeat(booking.getSeat());

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -31,7 +32,7 @@ public class Screening {
     private Room room;
 
     @OneToMany(mappedBy = "screening", fetch = FetchType.LAZY)
-    private Set<Booking> bookings;
+    private Set<Booking> bookings = new HashSet<>();
 
     @NotNull
     @Column(nullable = false)
@@ -60,7 +61,11 @@ public class Screening {
     }
 
     public void setMovie(Movie movie) {
+        if (this.movie != null) {
+            this.movie.getScreenings().remove(this);
+        }
         this.movie = movie;
+        movie.getScreenings().add(this);
     }
 
     public Room getRoom() {
@@ -68,15 +73,15 @@ public class Screening {
     }
 
     public void setRoom(Room room) {
+        if (this.room != null) {
+            this.room.getScreenings().remove(this);
+        }
         this.room = room;
+        room.getScreenings().add(this);
     }
 
     public Set<Booking> getBookings() {
         return bookings;
-    }
-
-    public void setBookings(Set<Booking> bookings) {
-        this.bookings = bookings;
     }
 
     public LocalDateTime getStartTime() {

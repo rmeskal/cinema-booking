@@ -3,6 +3,7 @@ package com.rayan.cinemaapi.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -19,10 +20,10 @@ public class Room {
     private RoomType roomType;
 
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private Set<Seat> seats;
+    private Set<Seat> seats = new HashSet<>();
 
     @OneToMany(mappedBy = "room", fetch = FetchType.LAZY)
-    private Set<Screening> screenings;
+    private Set<Screening> screenings = new HashSet<>();
 
     public Long getId() {
         return id;
@@ -44,15 +45,7 @@ public class Room {
         return screenings;
     }
 
-    public void setScreenings(Set<Screening> screenings) {
-        this.screenings = screenings;
-    }
-
     public Set<Seat> getSeats() {
         return seats;
-    }
-
-    public void setSeats(Set<Seat> seats) {
-        this.seats = seats;
     }
 }

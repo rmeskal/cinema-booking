@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -29,7 +30,7 @@ public class Movie {
     private String thumbnailUrl;
 
     @OneToMany(mappedBy = "movie", fetch = FetchType.LAZY)
-    private Set<Screening> screenings;
+    private Set<Screening> screenings = new HashSet<>();
 
     public Long getId() {
         return id;
@@ -65,10 +66,6 @@ public class Movie {
 
     public Set<Screening> getScreenings() {
         return screenings;
-    }
-
-    public void setScreenings(Set<Screening> screenings) {
-        this.screenings = screenings;
     }
 
     public String getTitle() {

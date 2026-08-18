@@ -103,11 +103,23 @@ class BookingServiceTests {
         User oldUser = new User();
         User newUser = new User();
 
+        Room oldRoom = new Room();
+        oldRoom.setId(1L);
+
+        Room newRoom = new Room();
+        newRoom.setId(2L);
+
         Screening oldScreening = new Screening();
+        oldScreening.setRoom(oldRoom);
+
         Screening newScreening = new Screening();
+        newScreening.setRoom(newRoom);
 
         Seat oldSeat = new Seat();
+        oldSeat.setRoom(oldRoom);
+
         Seat newSeat = new Seat();
+        newSeat.setRoom(newRoom);
 
         Booking existingBooking = new Booking();
         existingBooking.setId(1L);
@@ -130,6 +142,39 @@ class BookingServiceTests {
         assertSame(newUser, result.getUser());
         assertSame(newScreening, result.getScreening());
         assertSame(newSeat, result.getSeat());
+    }
+
+    @Test
+    void updateBooking_throwsExceptionWhenSeatDoesNotBelongToScreeningRoom() {
+        Room screeningRoom = new Room();
+        screeningRoom.setId(1L);
+
+        Room seatRoom = new Room();
+        seatRoom.setId(2L);
+
+        Screening screening = new Screening();
+        screening.setRoom(screeningRoom);
+
+        Seat seat = new Seat();
+        seat.setRoom(seatRoom);
+
+        Booking existingBooking = new Booking();
+        existingBooking.setId(1L);
+
+        Booking updatedBooking = new Booking();
+        updatedBooking.setId(1L);
+        updatedBooking.setScreening(screening);
+        updatedBooking.setSeat(seat);
+
+        when(bookingRepository.findById(1L))
+                .thenReturn(Optional.of(existingBooking));
+
+        assertThrows(
+                InvalidBookingException.class,
+                () -> bookingService.updateBooking(updatedBooking)
+        );
+
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test

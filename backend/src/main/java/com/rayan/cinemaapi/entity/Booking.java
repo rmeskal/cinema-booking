@@ -47,7 +47,11 @@ public class Booking {
     }
 
     public void setScreening(Screening screening) {
+        if (this.screening != null) {
+            this.screening.getBookings().remove(this);
+        }
         this.screening = screening;
+        screening.getBookings().add(this);
     }
 
     public User getUser() {
@@ -55,7 +59,11 @@ public class Booking {
     }
 
     public void setUser(User user) {
+        if (this.user != null) {
+            this.user.getBookings().remove(this);
+        }
         this.user = user;
+        user.getBookings().add(this);
     }
 
     public Seat getSeat() {
@@ -63,6 +71,10 @@ public class Booking {
     }
 
     public void setSeat(Seat seat) {
+        if (this.seat != null) {
+            this.seat.getBookings().remove(this);
+        }
         this.seat = seat;
+        seat.getBookings().add(this);
     }
 }
