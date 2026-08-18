@@ -43,6 +43,8 @@ public class ScreeningService {
 
     @Transactional
     public Screening updateScreening(Screening screening) {
+        Screening existingScreening = getScreening(screening.getId());
+
         // A room cannot have two screenings that overlap in time, excluding the current screening
         if (screeningRepository.existsOverlappingScreeningExcept(
                 screening.getRoom().getId(),
@@ -52,8 +54,6 @@ public class ScreeningService {
         )) {
             throw new ScreeningOverlapException(screening.getRoom().getId());
         }
-
-        Screening existingScreening = getScreening(screening.getId());
 
         existingScreening.setStartTime(screening.getStartTime());
         existingScreening.setPriceInCents(screening.getPriceInCents());

@@ -126,6 +126,9 @@ class ScreeningServiceTests {
                 LocalDateTime.of(2026, 8, 17, 20, 0)
         );
 
+        when(screeningRepository.findById(1L))
+                .thenReturn(Optional.of(screening));
+
         when(screeningRepository.existsOverlappingScreeningExcept(
                 1L,
                 screening.getStartTime(),
@@ -135,6 +138,20 @@ class ScreeningServiceTests {
 
         assertThrows(
                 ScreeningOverlapException.class,
+                () -> screeningService.updateScreening(screening)
+        );
+    }
+
+    @Test
+    void updateScreening_throwsExceptionWhenNotFound() {
+        Screening screening = new Screening();
+        screening.setId(1L);
+
+        when(screeningRepository.findById(1L))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                EntityNotFoundException.class,
                 () -> screeningService.updateScreening(screening)
         );
     }
