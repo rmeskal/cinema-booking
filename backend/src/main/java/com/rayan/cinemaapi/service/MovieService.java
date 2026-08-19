@@ -32,6 +32,10 @@ public class MovieService {
     }
 
     public void deleteMovie(Long id) {
+        if (!movieRepository.existsById(id)) {
+            throw new EntityNotFoundException("Movie", id);
+        }
+
         movieRepository.deleteById(id);
     }
 
