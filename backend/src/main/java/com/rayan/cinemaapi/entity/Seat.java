@@ -3,6 +3,7 @@ package com.rayan.cinemaapi.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -12,14 +13,14 @@ public class Seat {
     @EmbeddedId
     private SeatId seatId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("roomId")
     @NotNull
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
-    @OneToMany(mappedBy = "seat")
-    private Set<Booking> bookings;
+    @OneToMany(mappedBy = "seat", fetch = FetchType.LAZY)
+    private Set<Booking> bookings = new HashSet<>();
 
     public SeatId getSeatId() {
         return seatId;
@@ -33,15 +34,15 @@ public class Seat {
         return bookings;
     }
 
-    public void setBookings(Set<Booking> bookings) {
-        this.bookings = bookings;
-    }
-
     public Room getRoom() {
         return room;
     }
 
     public void setRoom(Room room) {
+        if (this.room != null) {
+            this.room.getSeats().remove(this);
+        }
         this.room = room;
+        room.getSeats().add(this);
     }
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -27,8 +28,8 @@ public class User {
     @Email
     private String email;
 
-    @OneToMany(mappedBy = "user")
-    private Set<Booking> bookings;
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private Set<Booking> bookings = new HashSet<>();
 
     public Long getId() {
         return id;
@@ -64,9 +65,5 @@ public class User {
 
     public Set<Booking> getBookings() {
         return bookings;
-    }
-
-    public void setBookings(Set<Booking> bookings) {
-        this.bookings = bookings;
     }
 }

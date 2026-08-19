@@ -96,6 +96,7 @@ class PersistenceTests {
     @Transactional
     void shouldPersistMovie() {
         Movie movie = new Movie();
+        movie.setTitle("Test Movie");
         movie.setDescription("A test movie");
         movie.setDurationInMinutes(120);
         movie.setThumbnailUrl("https://example.com/movie.jpg");
@@ -115,6 +116,7 @@ class PersistenceTests {
     @Transactional
     void shouldPersistScreeningWithMovieAndRoom() {
         Movie movie = new Movie();
+        movie.setTitle("Test Movie");
         movie.setDescription("Test Movie");
         movie.setDurationInMinutes(120);
         entityManager.persist(movie);
@@ -195,6 +197,7 @@ class PersistenceTests {
 
         // Movie
         Movie movie = new Movie();
+        movie.setTitle("Test Movie");
         movie.setDescription("Test Movie");
         movie.setDurationInMinutes(120);
         entityManager.persist(movie);
@@ -350,11 +353,13 @@ class PersistenceTests {
         entityManager.persist(room);
 
         Movie movie1 = new Movie();
+        movie1.setTitle("Movie 1");
         movie1.setDescription("Movie 1");
         movie1.setDurationInMinutes(120);
         entityManager.persist(movie1);
 
         Movie movie2 = new Movie();
+        movie2.setTitle("Movie 2");
         movie2.setDescription("Movie 2");
         movie2.setDurationInMinutes(100);
         entityManager.persist(movie2);
@@ -411,6 +416,7 @@ class PersistenceTests {
 
         // Movie
         Movie movie = new Movie();
+        movie.setTitle("Test Movie");
         movie.setDescription("Test Movie");
         movie.setDurationInMinutes(120);
         entityManager.persist(movie);

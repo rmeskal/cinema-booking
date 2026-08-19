@@ -18,6 +18,14 @@ public class SeatId {
     @Column(name = "room_id")
     private Long roomId;
 
+    public SeatId() {
+    }
+
+    public SeatId(String seatLabel, Long roomId) {
+        this.seatLabel = seatLabel;
+        this.roomId = roomId;
+    }
+
     public String getSeatLabel() {
         return seatLabel;
     }
@@ -43,5 +51,10 @@ public class SeatId {
     @Override
     public int hashCode() {
         return Objects.hash(seatLabel, roomId);
+    }
+
+    @Override
+    public String toString() {
+        return seatLabel + " in room " + roomId;
     }
 }
