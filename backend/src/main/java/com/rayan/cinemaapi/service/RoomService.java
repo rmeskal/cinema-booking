@@ -2,8 +2,11 @@ package com.rayan.cinemaapi.service;
 
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.RoomType;
+import com.rayan.cinemaapi.entity.Seat;
+import com.rayan.cinemaapi.entity.SeatId;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.repository.RoomRepository;
+import com.rayan.cinemaapi.repository.SeatRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,10 +17,15 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final RoomTypeService roomTypeService;
+    private final SeatRepository seatRepository;
 
-    public RoomService(RoomRepository roomRepository, RoomTypeService roomTypeService) {
+    private static final int SEAT_ROWS = 6;
+    private static final int SEATS_PER_ROW = 10;
+
+    public RoomService(RoomRepository roomRepository, RoomTypeService roomTypeService, SeatRepository seatRepository) {
         this.roomRepository = roomRepository;
         this.roomTypeService = roomTypeService;
+        this.seatRepository = seatRepository;
     }
 
     public List<Room> getRooms(){
@@ -30,6 +38,7 @@ public class RoomService {
         );
     }
 
+    @Transactional
     public Room createRoom(Room room) {
         RoomType roomType = roomTypeService.getRoomType(room.getRoomType().getId());
 
@@ -37,7 +46,28 @@ public class RoomService {
         // The following line gets used to fill in the other attributes of the roomtype
         room.setRoomType(roomType);
 
-        return roomRepository.save(room);
+        Room savedRoom = roomRepository.save(room);
+        createSeats(savedRoom);
+
+        return savedRoom;
+    }
+
+    private void createSeats(Room room) {
+        for (int row = 0; row < SEAT_ROWS; row++) {
+            char rowLabel = (char) ('A' + row);
+
+            for (int number = 1; number <= SEATS_PER_ROW; number++) {
+                String seatLabel = rowLabel + String.valueOf(number);
+
+                SeatId seatId = new SeatId(seatLabel, room.getId());
+
+                Seat seat = new Seat();
+                seat.setSeatId(seatId);
+                seat.setRoom(room);
+
+                seatRepository.save(seat);
+            }
+        }
     }
 
     public void deleteRoom(Long id) {
