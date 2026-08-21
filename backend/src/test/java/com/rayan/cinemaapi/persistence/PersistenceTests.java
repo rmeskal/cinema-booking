@@ -1,5 +1,6 @@
-package com.rayan.cinemaapi;
+package com.rayan.cinemaapi.persistence;
 
+import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -28,8 +29,7 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldPersistAndRetrieveRoomType() {
-        RoomType roomType = new RoomType();
-        roomType.setName("IMAX");
+        RoomType roomType = TestDataFactory.createRoomType("IMAX");
 
         entityManager.persist(roomType);
         entityManager.flush();
@@ -43,13 +43,10 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldPersistRoomWithRoomType() {
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
-
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        Room room = new Room();
-        room.setRoomType(roomType);
+        Room room = TestDataFactory.createRoom(roomType);
 
         entityManager.persist(room);
         entityManager.flush();
@@ -64,13 +61,10 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldPersistSeatWithRoom() {
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
-
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        Room room = new Room();
-        room.setRoomType(roomType);
+        Room room = TestDataFactory.createRoom(roomType);
         entityManager.persist(room);
 
         SeatId seatId = new SeatId();
@@ -95,11 +89,11 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldPersistMovie() {
-        Movie movie = new Movie();
-        movie.setTitle("Test Movie");
-        movie.setDescription("A test movie");
-        movie.setDurationInMinutes(120);
-        movie.setThumbnailUrl("https://example.com/movie.jpg");
+        Movie movie = TestDataFactory.createMovie(
+                "Test Movie",
+                "A test movie",
+                120
+        );
 
         entityManager.persist(movie);
         entityManager.flush();
@@ -109,30 +103,34 @@ class PersistenceTests {
 
         assertEquals("A test movie", retrieved.getDescription());
         assertEquals(120, retrieved.getDurationInMinutes());
-        assertEquals("https://example.com/movie.jpg", retrieved.getThumbnailUrl());
+        assertEquals(
+                "https://example.com/movie.jpg",
+                retrieved.getThumbnailUrl()
+        );
     }
 
     @Test
     @Transactional
     void shouldPersistScreeningWithMovieAndRoom() {
-        Movie movie = new Movie();
-        movie.setTitle("Test Movie");
-        movie.setDescription("Test Movie");
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie(
+                "Test Movie",
+                "Test Movie",
+                120
+        );
         entityManager.persist(movie);
 
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        Room room = new Room();
-        room.setRoomType(roomType);
+        Room room = TestDataFactory.createRoom(roomType);
         entityManager.persist(room);
 
         Screening screening = new Screening();
         screening.setMovie(movie);
         screening.setRoom(room);
-        screening.setStartTime(java.time.LocalDateTime.of(2026, 8, 12, 20, 0));
+        screening.setStartTime(
+                LocalDateTime.of(2026, 8, 12, 20, 0)
+        );
         screening.setPriceInCents(1200);
 
         entityManager.persist(screening);
@@ -147,7 +145,7 @@ class PersistenceTests {
         assertEquals(movie.getId(), retrieved.getMovie().getId());
         assertEquals(room.getId(), retrieved.getRoom().getId());
         assertEquals(
-                java.time.LocalDateTime.of(2026, 8, 12, 20, 0),
+                LocalDateTime.of(2026, 8, 12, 20, 0),
                 retrieved.getStartTime()
         );
         assertEquals(1200, retrieved.getPriceInCents());
@@ -175,17 +173,12 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldPersistBookingWithUserScreeningAndSeat() {
-        // RoomType
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        // Room
-        Room room = new Room();
-        room.setRoomType(roomType);
+        Room room = TestDataFactory.createRoom(roomType);
         entityManager.persist(room);
 
-        // Seat
         SeatId seatId = new SeatId();
         seatId.setSeatLabel("A1");
         seatId.setRoomId(room.getId());
@@ -195,31 +188,28 @@ class PersistenceTests {
         seat.setRoom(room);
         entityManager.persist(seat);
 
-        // Movie
-        Movie movie = new Movie();
-        movie.setTitle("Test Movie");
-        movie.setDescription("Test Movie");
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie(
+                "Test Movie",
+                "Test Movie",
+                120
+        );
         entityManager.persist(movie);
 
-        // Screening
         Screening screening = new Screening();
         screening.setMovie(movie);
         screening.setRoom(room);
         screening.setStartTime(
-                java.time.LocalDateTime.of(2026, 8, 12, 20, 0)
+                LocalDateTime.of(2026, 8, 12, 20, 0)
         );
         screening.setPriceInCents(1200);
         entityManager.persist(screening);
 
-        // User
         User user = new User();
         user.setFirstName("John");
         user.setLastName("Doe");
         user.setEmail("john.booking@test.com");
         entityManager.persist(user);
 
-        // Booking
         Booking booking = new Booking();
         booking.setScreening(screening);
         booking.setUser(user);
@@ -236,12 +226,10 @@ class PersistenceTests {
 
         assertEquals(screening.getId(), retrieved.getScreening().getId());
         assertEquals(user.getId(), retrieved.getUser().getId());
-
         assertEquals(
                 "A1",
                 retrieved.getSeat().getSeatId().getSeatLabel()
         );
-
         assertEquals(
                 room.getId(),
                 retrieved.getSeat().getSeatId().getRoomId()
@@ -251,16 +239,13 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldAllowSameSeatLabelInDifferentRooms() {
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        Room room1 = new Room();
-        room1.setRoomType(roomType);
+        Room room1 = TestDataFactory.createRoom("Room 1", roomType);
         entityManager.persist(room1);
 
-        Room room2 = new Room();
-        room2.setRoomType(roomType);
+        Room room2 = TestDataFactory.createRoom("Room 2", roomType);
         entityManager.persist(room2);
 
         SeatId seatId1 = new SeatId();
@@ -296,15 +281,13 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldRejectDuplicateRoomTypeName() {
-        RoomType first = new RoomType();
-        first.setName("IMAX");
+        RoomType first = TestDataFactory.createRoomType("IMAX");
 
         entityManager.persist(first);
         entityManager.flush();
         entityManager.clear();
 
-        RoomType duplicate = new RoomType();
-        duplicate.setName("IMAX");
+        RoomType duplicate = TestDataFactory.createRoomType("IMAX");
 
         assertThrows(
                 PersistenceException.class,
@@ -344,24 +327,24 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldRejectTwoScreeningsInSameRoomAtSameTime() {
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        Room room = new Room();
-        room.setRoomType(roomType);
+        Room room = TestDataFactory.createRoom(roomType);
         entityManager.persist(room);
 
-        Movie movie1 = new Movie();
-        movie1.setTitle("Movie 1");
-        movie1.setDescription("Movie 1");
-        movie1.setDurationInMinutes(120);
+        Movie movie1 = TestDataFactory.createMovie(
+                "Movie 1",
+                "Movie 1",
+                120
+        );
         entityManager.persist(movie1);
 
-        Movie movie2 = new Movie();
-        movie2.setTitle("Movie 2");
-        movie2.setDescription("Movie 2");
-        movie2.setDurationInMinutes(100);
+        Movie movie2 = TestDataFactory.createMovie(
+                "Movie 2",
+                "Movie 2",
+                100
+        );
         entityManager.persist(movie2);
 
         LocalDateTime startTime =
@@ -394,17 +377,12 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldRejectDoubleBooking() {
-        // RoomType
-        RoomType roomType = new RoomType();
-        roomType.setName("Standard");
+        RoomType roomType = TestDataFactory.createRoomType("Standard");
         entityManager.persist(roomType);
 
-        // Room
-        Room room = new Room();
-        room.setRoomType(roomType);
+        Room room = TestDataFactory.createRoom(roomType);
         entityManager.persist(room);
 
-        // Seat
         SeatId seatId = new SeatId();
         seatId.setSeatLabel("A1");
         seatId.setRoomId(room.getId());
@@ -414,14 +392,9 @@ class PersistenceTests {
         seat.setRoom(room);
         entityManager.persist(seat);
 
-        // Movie
-        Movie movie = new Movie();
-        movie.setTitle("Test Movie");
-        movie.setDescription("Test Movie");
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie();
         entityManager.persist(movie);
 
-        // Screening
         Screening screening = new Screening();
         screening.setMovie(movie);
         screening.setRoom(room);
@@ -431,21 +404,18 @@ class PersistenceTests {
         screening.setPriceInCents(1200);
         entityManager.persist(screening);
 
-        // First user
         User user1 = new User();
         user1.setFirstName("John");
         user1.setLastName("Doe");
         user1.setEmail("user1@test.com");
         entityManager.persist(user1);
 
-        // Second user
         User user2 = new User();
         user2.setFirstName("Jane");
         user2.setLastName("Doe");
         user2.setEmail("user2@test.com");
         entityManager.persist(user2);
 
-        // First booking
         Booking first = new Booking();
         first.setScreening(screening);
         first.setUser(user1);
@@ -454,7 +424,6 @@ class PersistenceTests {
         entityManager.persist(first);
         entityManager.flush();
 
-        // Second booking for the exact same seat and screening
         Booking duplicate = new Booking();
         duplicate.setScreening(screening);
         duplicate.setUser(user2);
@@ -648,15 +617,16 @@ class PersistenceTests {
 
     @Test
     void shouldAcceptValidMovieDuration() {
-        Movie movie = new Movie();
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie();
 
         Set<ConstraintViolation<Movie>> violations =
                 validator.validate(movie);
 
-        assertTrue(violations.stream()
-                .noneMatch(v -> v.getPropertyPath().toString()
-                        .equals("durationInMinutes")));
+        assertTrue(
+                violations.stream()
+                        .noneMatch(v -> v.getPropertyPath().toString()
+                                .equals("durationInMinutes"))
+        );
     }
 
     @Test
@@ -667,8 +637,10 @@ class PersistenceTests {
         Set<ConstraintViolation<User>> violations =
                 validator.validate(user);
 
-        assertTrue(violations.stream()
-                .noneMatch(v -> v.getPropertyPath().toString()
-                        .equals("email")));
+        assertTrue(
+                violations.stream()
+                        .noneMatch(v -> v.getPropertyPath().toString()
+                                .equals("email"))
+        );
     }
 }

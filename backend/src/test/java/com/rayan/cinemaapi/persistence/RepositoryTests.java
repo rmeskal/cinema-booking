@@ -1,5 +1,6 @@
-package com.rayan.cinemaapi;
+package com.rayan.cinemaapi.persistence;
 
+import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.*;
 import com.rayan.cinemaapi.repository.*;
 import org.junit.jupiter.api.Test;
@@ -32,10 +33,11 @@ class RepositoryTests {
 
     @Test
     void saveAndFindMovie() {
-        Movie movie = new Movie();
-        movie.setTitle("Test Movie");
-        movie.setDescription("A test movie");
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie(
+                "Test Movie",
+                "A test movie",
+                120
+        );
 
         Movie saved = movieRepository.save(movie);
 
@@ -50,15 +52,17 @@ class RepositoryTests {
 
     @Test
     void findAllMovies() {
-        Movie first = new Movie();
-        first.setTitle("First movie");
-        first.setDescription("The first movie");
-        first.setDurationInMinutes(100);
+        Movie first = TestDataFactory.createMovie(
+                "First movie",
+                "The first movie",
+                100
+        );
 
-        Movie second = new Movie();
-        second.setTitle("Second movie");
-        second.setDescription("The second movie");
-        second.setDurationInMinutes(120);
+        Movie second = TestDataFactory.createMovie(
+                "Second movie",
+                "The second movie",
+                120
+        );
 
         movieRepository.save(first);
         movieRepository.save(second);
@@ -72,10 +76,7 @@ class RepositoryTests {
 
     @Test
     void existsById() {
-        Movie movie = new Movie();
-        movie.setTitle("Test movie");
-        movie.setDescription("A test movie");
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie();
 
         Movie saved = movieRepository.save(movie);
 
@@ -85,10 +86,7 @@ class RepositoryTests {
 
     @Test
     void deleteById() {
-        Movie movie = new Movie();
-        movie.setTitle("Test movie");
-        movie.setDescription("A test movie");
-        movie.setDurationInMinutes(120);
+        Movie movie = TestDataFactory.createMovie();
 
         Movie saved = movieRepository.save(movie);
 
@@ -101,19 +99,15 @@ class RepositoryTests {
 
     @Test
     void saveAndFindScreeningWithRelationships() {
-        Movie movie = new Movie();
-        movie.setTitle("Test movie");
-        movie.setDescription("A test movie");
-        movie.setDurationInMinutes(120);
-        movie = movieRepository.save(movie);
+        Movie movie = movieRepository.save(TestDataFactory.createMovie());
 
-        RoomType roomType = new RoomType();
-        roomType.setName("Test room type");
-        roomType = roomTypeRepository.save(roomType);
+        RoomType roomType = roomTypeRepository.save(
+                TestDataFactory.createRoomType("Test room type")
+        );
 
-        Room room = new Room();
-        room.setRoomType(roomType);
-        room = roomRepository.save(room);
+        Room room = roomRepository.save(
+                TestDataFactory.createRoom(roomType)
+        );
 
         Screening screening = new Screening();
         screening.setMovie(movie);
@@ -131,13 +125,13 @@ class RepositoryTests {
 
     @Test
     void saveAndFindSeatWithCompositeId() {
-        RoomType roomType = new RoomType();
-        roomType.setName("Test room type");
-        roomType = roomTypeRepository.save(roomType);
+        RoomType roomType = roomTypeRepository.save(
+                TestDataFactory.createRoomType("Test room type")
+        );
 
-        Room room = new Room();
-        room.setRoomType(roomType);
-        room = roomRepository.save(room);
+        Room room = roomRepository.save(
+                TestDataFactory.createRoom(roomType)
+        );
 
         SeatId seatId = new SeatId();
         seatId.setSeatLabel("A1");

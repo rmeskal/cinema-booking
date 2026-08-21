@@ -1,4 +1,4 @@
-package com.rayan.cinemaapi;
+package com.rayan.cinemaapi.persistence;
 
 import com.rayan.cinemaapi.entity.*;
 import org.junit.jupiter.api.Test;
