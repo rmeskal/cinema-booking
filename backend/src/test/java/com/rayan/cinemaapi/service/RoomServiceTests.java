@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.RoomType;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
@@ -21,12 +22,16 @@ class RoomServiceTests {
     @Mock
     private RoomRepository roomRepository;
 
+    @Mock
+    private RoomTypeService roomTypeService;
+
     @InjectMocks
     private RoomService roomService;
 
     @Test
     void getRoom_throwsExceptionWhenNotFound() {
-        when(roomRepository.findById(1L)).thenReturn(Optional.empty());
+        when(roomRepository.findById(1L))
+                .thenReturn(Optional.empty());
 
         assertThrows(
                 EntityNotFoundException.class,
@@ -36,19 +41,23 @@ class RoomServiceTests {
 
     @Test
     void updateRoom_updatesRoomType() {
-        RoomType oldType = new RoomType();
-        RoomType newType = new RoomType();
+        RoomType oldType = TestDataFactory.createRoomType("Standard");
+        oldType.setId(1L);
 
-        Room existingRoom = new Room();
+        RoomType newType = TestDataFactory.createRoomType("IMAX");
+        newType.setId(2L);
+
+        Room existingRoom = TestDataFactory.createRoom(oldType);
         existingRoom.setId(1L);
-        existingRoom.setRoomType(oldType);
 
-        Room updatedRoom = new Room();
+        Room updatedRoom = TestDataFactory.createRoom(newType);
         updatedRoom.setId(1L);
-        updatedRoom.setRoomType(newType);
 
         when(roomRepository.findById(1L))
                 .thenReturn(Optional.of(existingRoom));
+
+        when(roomTypeService.getRoomType(2L))
+                .thenReturn(newType);
 
         Room result = roomService.updateRoom(updatedRoom);
 

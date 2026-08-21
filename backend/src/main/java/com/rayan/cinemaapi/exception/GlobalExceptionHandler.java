@@ -45,4 +45,13 @@ public class GlobalExceptionHandler {
                 "Request body is invalid."
         );
     }
+
+    @ExceptionHandler(EntityInUseException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleEntityInUse(EntityInUseException exception) {
+        return new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                exception.getMessage()
+        );
+    }
 }
