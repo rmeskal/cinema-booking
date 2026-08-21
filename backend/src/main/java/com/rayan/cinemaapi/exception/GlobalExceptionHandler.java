@@ -1,6 +1,7 @@
 package com.rayan.cinemaapi.exception;
 
 import com.rayan.cinemaapi.dto.error.ErrorResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -52,6 +53,17 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
                 exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDataIntegrityViolation(
+            DataIntegrityViolationException exception
+    ) {
+        return new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                "The request conflicts with existing data."
         );
     }
 }
