@@ -6,7 +6,6 @@ import com.rayan.cinemaapi.entity.Seat;
 import com.rayan.cinemaapi.entity.SeatId;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.repository.RoomRepository;
-import com.rayan.cinemaapi.repository.SeatRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,15 +16,13 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final RoomTypeService roomTypeService;
-    private final SeatRepository seatRepository;
 
     private static final int SEAT_ROWS = 6;
     private static final int SEATS_PER_ROW = 10;
 
-    public RoomService(RoomRepository roomRepository, RoomTypeService roomTypeService, SeatRepository seatRepository) {
+    public RoomService(RoomRepository roomRepository, RoomTypeService roomTypeService) {
         this.roomRepository = roomRepository;
         this.roomTypeService = roomTypeService;
-        this.seatRepository = seatRepository;
     }
 
     public List<Room> getRooms(){
@@ -64,8 +61,6 @@ public class RoomService {
                 Seat seat = new Seat();
                 seat.setSeatId(seatId);
                 seat.setRoom(room);
-
-                seatRepository.save(seat);
             }
         }
     }
