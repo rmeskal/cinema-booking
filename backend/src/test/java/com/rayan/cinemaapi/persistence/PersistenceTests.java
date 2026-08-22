@@ -125,9 +125,7 @@ class PersistenceTests {
         Room room = TestDataFactory.createRoom(roomType);
         entityManager.persist(room);
 
-        Screening screening = new Screening();
-        screening.setMovie(movie);
-        screening.setRoom(room);
+        Screening screening = TestDataFactory.createScreening(movie, room);
         screening.setStartTime(
                 LocalDateTime.of(2026, 8, 12, 20, 0)
         );
@@ -154,10 +152,13 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldPersistUser() {
-        User user = new User();
-        user.setFirstName("John");
-        user.setLastName("Doe");
-        user.setEmail("john.doe@test.com");
+        User user = TestDataFactory.createUser(
+                "John",
+                "Doe",
+                "john.doe@test.com",
+                "hashed-password",
+                Role.USER
+        );
 
         entityManager.persist(user);
         entityManager.flush();
@@ -168,6 +169,8 @@ class PersistenceTests {
         assertEquals("John", retrieved.getFirstName());
         assertEquals("Doe", retrieved.getLastName());
         assertEquals("john.doe@test.com", retrieved.getEmail());
+        assertEquals("hashed-password", retrieved.getPasswordHash());
+        assertEquals(Role.USER, retrieved.getRole());
     }
 
     @Test
@@ -195,25 +198,27 @@ class PersistenceTests {
         );
         entityManager.persist(movie);
 
-        Screening screening = new Screening();
-        screening.setMovie(movie);
-        screening.setRoom(room);
+        Screening screening = TestDataFactory.createScreening(movie, room);
         screening.setStartTime(
                 LocalDateTime.of(2026, 8, 12, 20, 0)
         );
         screening.setPriceInCents(1200);
         entityManager.persist(screening);
 
-        User user = new User();
-        user.setFirstName("John");
-        user.setLastName("Doe");
-        user.setEmail("john.booking@test.com");
+        User user = TestDataFactory.createUser(
+                "John",
+                "Doe",
+                "john.booking@test.com",
+                "hashed-password",
+                Role.USER
+        );
         entityManager.persist(user);
 
-        Booking booking = new Booking();
-        booking.setScreening(screening);
-        booking.setUser(user);
-        booking.setSeat(seat);
+        Booking booking = TestDataFactory.createBooking(
+                screening,
+                user,
+                seat
+        );
 
         entityManager.persist(booking);
         entityManager.flush();
@@ -301,19 +306,25 @@ class PersistenceTests {
     @Test
     @Transactional
     void shouldRejectDuplicateUserEmail() {
-        User first = new User();
-        first.setFirstName("John");
-        first.setLastName("Doe");
-        first.setEmail("duplicate@test.com");
+        User first = TestDataFactory.createUser(
+                "John",
+                "Doe",
+                "duplicate@test.com",
+                "hashed-password",
+                Role.USER
+        );
 
         entityManager.persist(first);
         entityManager.flush();
         entityManager.clear();
 
-        User duplicate = new User();
-        duplicate.setFirstName("Jane");
-        duplicate.setLastName("Doe");
-        duplicate.setEmail("duplicate@test.com");
+        User duplicate = TestDataFactory.createUser(
+                "Jane",
+                "Doe",
+                "duplicate@test.com",
+                "hashed-password",
+                Role.USER
+        );
 
         assertThrows(
                 PersistenceException.class,
@@ -350,19 +361,21 @@ class PersistenceTests {
         LocalDateTime startTime =
                 LocalDateTime.of(2026, 8, 12, 20, 0);
 
-        Screening first = new Screening();
-        first.setMovie(movie1);
-        first.setRoom(room);
-        first.setStartTime(startTime);
+        Screening first = TestDataFactory.createScreening(
+                movie1,
+                room,
+                startTime
+        );
         first.setPriceInCents(1000);
 
         entityManager.persist(first);
         entityManager.flush();
 
-        Screening duplicate = new Screening();
-        duplicate.setMovie(movie2);
-        duplicate.setRoom(room);
-        duplicate.setStartTime(startTime);
+        Screening duplicate = TestDataFactory.createScreening(
+                movie2,
+                room,
+                startTime
+        );
         duplicate.setPriceInCents(1200);
 
         assertThrows(
@@ -395,39 +408,46 @@ class PersistenceTests {
         Movie movie = TestDataFactory.createMovie();
         entityManager.persist(movie);
 
-        Screening screening = new Screening();
-        screening.setMovie(movie);
-        screening.setRoom(room);
-        screening.setStartTime(
+        Screening screening = TestDataFactory.createScreening(
+                movie,
+                room,
                 LocalDateTime.of(2026, 8, 12, 20, 0)
         );
         screening.setPriceInCents(1200);
         entityManager.persist(screening);
 
-        User user1 = new User();
-        user1.setFirstName("John");
-        user1.setLastName("Doe");
-        user1.setEmail("user1@test.com");
+        User user1 = TestDataFactory.createUser(
+                "John",
+                "Doe",
+                "user1@test.com",
+                "hashed-password",
+                Role.USER
+        );
         entityManager.persist(user1);
 
-        User user2 = new User();
-        user2.setFirstName("Jane");
-        user2.setLastName("Doe");
-        user2.setEmail("user2@test.com");
+        User user2 = TestDataFactory.createUser(
+                "Jane",
+                "Doe",
+                "user2@test.com",
+                "hashed-password",
+                Role.USER
+        );
         entityManager.persist(user2);
 
-        Booking first = new Booking();
-        first.setScreening(screening);
-        first.setUser(user1);
-        first.setSeat(seat);
+        Booking first = TestDataFactory.createBooking(
+                screening,
+                user1,
+                seat
+        );
 
         entityManager.persist(first);
         entityManager.flush();
 
-        Booking duplicate = new Booking();
-        duplicate.setScreening(screening);
-        duplicate.setUser(user2);
-        duplicate.setSeat(seat);
+        Booking duplicate = TestDataFactory.createBooking(
+                screening,
+                user2,
+                seat
+        );
 
         assertThrows(
                 PersistenceException.class,
@@ -557,7 +577,7 @@ class PersistenceTests {
 
     @Test
     void shouldRejectUserWithBlankFirstName() {
-        User user = new User();
+        User user = TestDataFactory.createUser();
         user.setFirstName("");
 
         Set<ConstraintViolation<User>> violations =
@@ -572,7 +592,7 @@ class PersistenceTests {
 
     @Test
     void shouldRejectUserWithBlankLastName() {
-        User user = new User();
+        User user = TestDataFactory.createUser();
         user.setLastName("");
 
         Set<ConstraintViolation<User>> violations =
@@ -587,7 +607,7 @@ class PersistenceTests {
 
     @Test
     void shouldRejectUserWithBlankEmail() {
-        User user = new User();
+        User user = TestDataFactory.createUser();
         user.setEmail("");
 
         Set<ConstraintViolation<User>> violations =
@@ -602,7 +622,7 @@ class PersistenceTests {
 
     @Test
     void shouldRejectUserWithInvalidEmail() {
-        User user = new User();
+        User user = TestDataFactory.createUser();
         user.setEmail("not-an-email");
 
         Set<ConstraintViolation<User>> violations =
@@ -631,7 +651,7 @@ class PersistenceTests {
 
     @Test
     void shouldAcceptValidUserEmail() {
-        User user = new User();
+        User user = TestDataFactory.createUser();
         user.setEmail("john.doe@example.com");
 
         Set<ConstraintViolation<User>> violations =

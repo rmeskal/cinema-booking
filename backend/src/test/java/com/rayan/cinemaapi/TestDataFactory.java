@@ -1,9 +1,6 @@
 package com.rayan.cinemaapi;
 
-import com.rayan.cinemaapi.entity.Movie;
-import com.rayan.cinemaapi.entity.Room;
-import com.rayan.cinemaapi.entity.RoomType;
-import com.rayan.cinemaapi.entity.Screening;
+import com.rayan.cinemaapi.entity.*;
 
 import java.time.LocalDateTime;
 
@@ -72,5 +69,43 @@ public final class TestDataFactory {
         screening.setStartTime(startTime);
         screening.setPriceInCents(1000);
         return screening;
+    }
+
+    public static User createUser() {
+        return createUser(
+                "Test",
+                "User",
+                "test@example.com",
+                "hashed-password",
+                Role.USER
+        );
+    }
+
+    public static User createUser(
+            String firstName,
+            String lastName,
+            String email,
+            String passwordHash,
+            Role role
+    ) {
+        User user = new User();
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(email);
+        user.setPasswordHash(passwordHash);
+        user.setRole(role);
+        return user;
+    }
+
+    public static Booking createBooking(
+            Screening screening,
+            User user,
+            Seat seat
+    ) {
+        Booking booking = new Booking();
+        booking.setScreening(screening);
+        booking.setUser(user);
+        booking.setSeat(seat);
+        return booking;
     }
 }
