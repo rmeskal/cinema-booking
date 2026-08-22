@@ -3,6 +3,9 @@ package com.rayan.cinemaapi;
 import com.rayan.cinemaapi.entity.Movie;
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.RoomType;
+import com.rayan.cinemaapi.entity.Screening;
+
+import java.time.LocalDateTime;
 
 public final class TestDataFactory {
 
@@ -45,5 +48,29 @@ public final class TestDataFactory {
         room.setName(name);
         room.setRoomType(roomType);
         return room;
+    }
+
+    public static Screening createScreening(
+            Movie movie,
+            Room room
+    ) {
+        return createScreening(
+                movie,
+                room,
+                LocalDateTime.of(2026, 8, 17, 20, 0)
+        );
+    }
+
+    public static Screening createScreening(
+            Movie movie,
+            Room room,
+            LocalDateTime startTime
+    ) {
+        Screening screening = new Screening();
+        screening.setMovie(movie);
+        screening.setRoom(room);
+        screening.setStartTime(startTime);
+        screening.setPriceInCents(1000);
+        return screening;
     }
 }

@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Movie;
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.Screening;
@@ -23,6 +24,12 @@ class ScreeningServiceTests {
 
     @Mock
     private ScreeningRepository screeningRepository;
+
+    @Mock
+    private MovieService movieService;
+
+    @Mock
+    private RoomService roomService;
 
     @InjectMocks
     private ScreeningService screeningService;
@@ -52,19 +59,71 @@ class ScreeningServiceTests {
     }
 
     @Test
-    void createScreening_throwsExceptionWhenOverlapping() {
-        Room room = new Room();
+    void createScreening_throwsExceptionWhenMovieNotFound() {
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(1L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
         room.setId(1L);
 
-        Movie movie = new Movie();
-        movie.setDurationInMinutes(120);
+        Screening screening = TestDataFactory.createScreening(movie, room);
 
-        Screening screening = new Screening();
-        screening.setRoom(room);
-        screening.setMovie(movie);
-        screening.setStartTime(
-                LocalDateTime.of(2026, 8, 17, 20, 0)
+        when(movieService.getMovie(1L))
+                .thenThrow(new EntityNotFoundException("Movie", 1L));
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> screeningService.createScreening(screening)
         );
+
+        verifyNoInteractions(screeningRepository);
+    }
+
+    @Test
+    void createScreening_throwsExceptionWhenRoomNotFound() {
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(1L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
+        room.setId(1L);
+
+        Screening screening = TestDataFactory.createScreening(movie, room);
+
+        when(movieService.getMovie(1L))
+                .thenReturn(movie);
+
+        when(roomService.getRoom(1L))
+                .thenThrow(new EntityNotFoundException("Room", 1L));
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> screeningService.createScreening(screening)
+        );
+
+        verifyNoInteractions(screeningRepository);
+    }
+
+    @Test
+    void createScreening_throwsExceptionWhenOverlapping() {
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(1L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
+        room.setId(1L);
+
+        Screening screening = TestDataFactory.createScreening(movie, room);
+
+        when(movieService.getMovie(1L))
+                .thenReturn(movie);
+
+        when(roomService.getRoom(1L))
+                .thenReturn(room);
 
         when(screeningRepository.existsOverlappingScreening(
                 1L,
@@ -82,18 +141,21 @@ class ScreeningServiceTests {
 
     @Test
     void createScreening_savesWhenNoOverlap() {
-        Room room = new Room();
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(1L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
         room.setId(1L);
 
-        Movie movie = new Movie();
-        movie.setDurationInMinutes(120);
+        Screening screening = TestDataFactory.createScreening(movie, room);
 
-        Screening screening = new Screening();
-        screening.setRoom(room);
-        screening.setMovie(movie);
-        screening.setStartTime(
-                LocalDateTime.of(2026, 8, 17, 20, 0)
-        );
+        when(movieService.getMovie(1L))
+                .thenReturn(movie);
+
+        when(roomService.getRoom(1L))
+                .thenReturn(room);
 
         when(screeningRepository.existsOverlappingScreening(
                 1L,
@@ -111,38 +173,6 @@ class ScreeningServiceTests {
     }
 
     @Test
-    void updateScreening_throwsExceptionWhenOverlapping() {
-        Room room = new Room();
-        room.setId(1L);
-
-        Movie movie = new Movie();
-        movie.setDurationInMinutes(120);
-
-        Screening screening = new Screening();
-        screening.setId(1L);
-        screening.setRoom(room);
-        screening.setMovie(movie);
-        screening.setStartTime(
-                LocalDateTime.of(2026, 8, 17, 20, 0)
-        );
-
-        when(screeningRepository.findById(1L))
-                .thenReturn(Optional.of(screening));
-
-        when(screeningRepository.existsOverlappingScreeningExcept(
-                1L,
-                screening.getStartTime(),
-                screening.getEndTime(),
-                1L
-        )).thenReturn(true);
-
-        assertThrows(
-                ScreeningOverlapException.class,
-                () -> screeningService.updateScreening(screening)
-        );
-    }
-
-    @Test
     void updateScreening_throwsExceptionWhenNotFound() {
         Screening screening = new Screening();
         screening.setId(1L);
@@ -157,48 +187,173 @@ class ScreeningServiceTests {
     }
 
     @Test
+    void updateScreening_throwsExceptionWhenMovieNotFound() {
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(2L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
+        room.setId(2L);
+
+        Screening existingScreening =
+                TestDataFactory.createScreening(movie, room);
+        existingScreening.setId(1L);
+
+        Screening updatedScreening =
+                TestDataFactory.createScreening(movie, room);
+        updatedScreening.setId(1L);
+
+        when(screeningRepository.findById(1L))
+                .thenReturn(Optional.of(existingScreening));
+
+        when(movieService.getMovie(2L))
+                .thenThrow(new EntityNotFoundException("Movie", 2L));
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> screeningService.updateScreening(updatedScreening)
+        );
+
+        verify(screeningRepository, never())
+                .existsOverlappingScreeningExcept(anyLong(), any(), any(), anyLong());
+    }
+
+    @Test
+    void updateScreening_throwsExceptionWhenRoomNotFound() {
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(2L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
+        room.setId(2L);
+
+        Screening existingScreening =
+                TestDataFactory.createScreening(movie, room);
+        existingScreening.setId(1L);
+
+        Screening updatedScreening =
+                TestDataFactory.createScreening(movie, room);
+        updatedScreening.setId(1L);
+
+        when(screeningRepository.findById(1L))
+                .thenReturn(Optional.of(existingScreening));
+
+        when(movieService.getMovie(2L))
+                .thenReturn(movie);
+
+        when(roomService.getRoom(2L))
+                .thenThrow(new EntityNotFoundException("Room", 2L));
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> screeningService.updateScreening(updatedScreening)
+        );
+
+        verify(screeningRepository, never())
+                .existsOverlappingScreeningExcept(anyLong(), any(), any(), anyLong());
+    }
+
+    @Test
+    void updateScreening_throwsExceptionWhenOverlapping() {
+        Movie movie = TestDataFactory.createMovie();
+        movie.setId(1L);
+
+        Room room = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
+        room.setId(1L);
+
+        Screening screening = TestDataFactory.createScreening(movie, room);
+        screening.setId(1L);
+
+        LocalDateTime newStartTime = screening.getStartTime();
+        LocalDateTime newEndTime = newStartTime
+                .plusMinutes(movie.getDurationInMinutes());
+
+        when(screeningRepository.findById(1L))
+                .thenReturn(Optional.of(screening));
+
+        when(movieService.getMovie(1L))
+                .thenReturn(movie);
+
+        when(roomService.getRoom(1L))
+                .thenReturn(room);
+
+        when(screeningRepository.existsOverlappingScreeningExcept(
+                room.getId(),
+                newStartTime,
+                newEndTime,
+                screening.getId()
+        )).thenReturn(true);
+
+        assertThrows(
+                ScreeningOverlapException.class,
+                () -> screeningService.updateScreening(screening)
+        );
+    }
+
+    @Test
     void updateScreening_updatesFields() {
-        Room oldRoom = new Room();
+        Movie oldMovie = TestDataFactory.createMovie();
+        oldMovie.setId(1L);
+
+        Room oldRoom = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
         oldRoom.setId(1L);
 
-        Room newRoom = new Room();
-        newRoom.setId(2L);
-
-        Movie oldMovie = new Movie();
-        oldMovie.setDurationInMinutes(120);
-
-        Movie newMovie = new Movie();
+        Movie newMovie = TestDataFactory.createMovie();
+        newMovie.setId(2L);
         newMovie.setDurationInMinutes(150);
 
-        Screening existingScreening = new Screening();
+        Room newRoom = TestDataFactory.createRoom(
+                TestDataFactory.createRoomType()
+        );
+        newRoom.setId(2L);
+
+        Screening existingScreening =
+                TestDataFactory.createScreening(oldMovie, oldRoom);
         existingScreening.setId(1L);
-        existingScreening.setRoom(oldRoom);
-        existingScreening.setMovie(oldMovie);
         existingScreening.setStartTime(
                 LocalDateTime.of(2026, 8, 17, 18, 0)
         );
         existingScreening.setPriceInCents(1000);
 
-        Screening updatedScreening = new Screening();
-        updatedScreening.setId(1L);
-        updatedScreening.setRoom(newRoom);
-        updatedScreening.setMovie(newMovie);
-        updatedScreening.setStartTime(
-                LocalDateTime.of(2026, 8, 17, 20, 0)
-        );
-        updatedScreening.setPriceInCents(1500);
+        LocalDateTime newStartTime =
+                LocalDateTime.of(2026, 8, 17, 20, 0);
 
-        when(screeningRepository.existsOverlappingScreeningExcept(
-                2L,
-                updatedScreening.getStartTime(),
-                updatedScreening.getEndTime(),
-                1L
-        )).thenReturn(false);
+        LocalDateTime newEndTime =
+                newStartTime.plusMinutes(newMovie.getDurationInMinutes());
+
+        Screening updatedScreening =
+                TestDataFactory.createScreening(
+                        newMovie,
+                        newRoom,
+                        newStartTime
+                );
+        updatedScreening.setId(1L);
+        updatedScreening.setPriceInCents(1500);
 
         when(screeningRepository.findById(1L))
                 .thenReturn(Optional.of(existingScreening));
 
-        Screening result = screeningService.updateScreening(updatedScreening);
+        when(movieService.getMovie(2L))
+                .thenReturn(newMovie);
+
+        when(roomService.getRoom(2L))
+                .thenReturn(newRoom);
+
+        when(screeningRepository.existsOverlappingScreeningExcept(
+                newRoom.getId(),
+                newStartTime,
+                newEndTime,
+                updatedScreening.getId()
+        )).thenReturn(false);
+
+        Screening result =
+                screeningService.updateScreening(updatedScreening);
 
         assertSame(existingScreening, result);
         assertEquals(newRoom, result.getRoom());
@@ -212,6 +367,9 @@ class ScreeningServiceTests {
 
     @Test
     void deleteScreening_deletesScreeningById() {
+        when(screeningRepository.existsById(1L))
+                .thenReturn(true);
+
         screeningService.deleteScreening(1L);
 
         verify(screeningRepository).deleteById(1L);
