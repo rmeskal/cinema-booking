@@ -32,6 +32,10 @@ public class SeatService {
     }
 
     public void deleteSeat(SeatId id) {
+        if (!seatRepository.existsById(id)) {
+            throw new EntityNotFoundException("Seat", id);
+        }
+
         seatRepository.deleteById(id);
     }
 }

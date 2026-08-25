@@ -50,6 +50,10 @@ public class UserService {
     }
 
     public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new EntityNotFoundException("User", id);
+        }
+
         userRepository.deleteById(id);
     }
 }

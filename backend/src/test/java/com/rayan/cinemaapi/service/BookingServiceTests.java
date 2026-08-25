@@ -193,8 +193,24 @@ class BookingServiceTests {
 
     @Test
     void deleteBooking_deletesBookingById() {
+        when(bookingRepository.existsById(1L))
+                .thenReturn(true);
+
         bookingService.deleteBooking(1L);
 
         verify(bookingRepository).deleteById(1L);
+    }
+
+    @Test
+    void deleteBooking_throwsExceptionWhenBookingDoesNotExist() {
+        when(bookingRepository.existsById(1L))
+                .thenReturn(false);
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> bookingService.deleteBooking(1L)
+        );
+
+        verify(bookingRepository, never()).deleteById(1L);
     }
 }

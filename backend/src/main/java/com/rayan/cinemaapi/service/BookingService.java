@@ -55,6 +55,10 @@ public class BookingService {
     }
 
     public void deleteBooking(Long id) {
+        if (!bookingRepository.existsById(id)) {
+            throw new EntityNotFoundException("Booking", id);
+        }
+
         bookingRepository.deleteById(id);
     }
 }

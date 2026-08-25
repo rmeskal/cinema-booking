@@ -55,8 +55,26 @@ class SeatServiceTests {
     void deleteSeat_deletesSeatById() {
         SeatId seatId = new SeatId("A1", 1L);
 
+        when(seatRepository.existsById(seatId))
+                .thenReturn(true);
+
         seatService.deleteSeat(seatId);
 
         verify(seatRepository).deleteById(seatId);
+    }
+
+    @Test
+    void deleteSeat_throwsExceptionWhenSeatDoesNotExist() {
+        SeatId seatId = new SeatId("A1", 1L);
+
+        when(seatRepository.existsById(seatId))
+                .thenReturn(false);
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> seatService.deleteSeat(seatId)
+        );
+
+        verify(seatRepository, never()).deleteById(seatId);
     }
 }
