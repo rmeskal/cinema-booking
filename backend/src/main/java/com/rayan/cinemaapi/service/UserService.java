@@ -5,6 +5,8 @@ import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import com.rayan.cinemaapi.entity.Role;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -12,9 +14,11 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<User> getUsers() {
@@ -27,7 +31,10 @@ public class UserService {
         );
     }
 
-    public User createUser(User user) {
+    public User createUser(User user, String password) {
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setRole(Role.USER);
+
         return userRepository.save(user);
     }
 
