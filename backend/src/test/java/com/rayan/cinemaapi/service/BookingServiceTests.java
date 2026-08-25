@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.*;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.exception.InvalidBookingException;
@@ -21,12 +22,25 @@ class BookingServiceTests {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private ScreeningService screeningService;
+
+    @Mock
+    private UserService userService;
+
+    @Mock
+    private SeatService seatService;
+
     @InjectMocks
     private BookingService bookingService;
 
     @Test
     void getBooking_returnsBookingWhenFound() {
-        Booking booking = new Booking();
+        Booking booking = TestDataFactory.createBooking(
+                new Screening(),
+                new User(),
+                new Seat()
+        );
         booking.setId(1L);
 
         when(bookingRepository.findById(1L))
@@ -53,15 +67,34 @@ class BookingServiceTests {
         Room room = new Room();
         room.setId(1L);
 
-        Screening screening = new Screening();
-        screening.setRoom(room);
+        Movie movie = TestDataFactory.createMovie();
 
-        Seat seat = new Seat();
-        seat.setRoom(room);
+        Screening screening = TestDataFactory.createScreening(
+                movie,
+                room
+        );
+        screening.setId(1L);
 
-        Booking booking = new Booking();
-        booking.setScreening(screening);
-        booking.setSeat(seat);
+        User user = TestDataFactory.createUser();
+        user.setId(1L);
+
+        Seat seat = TestDataFactory.createSeat(room, "A1");
+        SeatId seatId = seat.getSeatId();
+
+        Booking booking = TestDataFactory.createBooking(
+                screening,
+                user,
+                seat
+        );
+
+        when(screeningService.getScreening(1L))
+                .thenReturn(screening);
+
+        when(userService.getUser(1L))
+                .thenReturn(user);
+
+        when(seatService.getSeat(seatId))
+                .thenReturn(seat);
 
         when(bookingRepository.save(booking))
                 .thenReturn(booking);
@@ -69,6 +102,10 @@ class BookingServiceTests {
         Booking result = bookingService.createBooking(booking);
 
         assertSame(booking, result);
+
+        verify(screeningService).getScreening(1L);
+        verify(userService).getUser(1L);
+        verify(seatService).getSeat(seatId);
         verify(bookingRepository).save(booking);
     }
 
@@ -80,61 +117,101 @@ class BookingServiceTests {
         Room seatRoom = new Room();
         seatRoom.setId(2L);
 
-        Screening screening = new Screening();
-        screening.setRoom(screeningRoom);
+        Screening screening = TestDataFactory.createScreening(
+                TestDataFactory.createMovie(),
+                screeningRoom
+        );
+        screening.setId(1L);
 
-        Seat seat = new Seat();
-        seat.setRoom(seatRoom);
+        User user = TestDataFactory.createUser();
+        user.setId(1L);
 
-        Booking booking = new Booking();
-        booking.setScreening(screening);
-        booking.setSeat(seat);
+        Seat seat = TestDataFactory.createSeat(
+                seatRoom,
+                "A1"
+        );
+        SeatId seatId = seat.getSeatId();
+
+        Booking booking = TestDataFactory.createBooking(
+                screening,
+                user,
+                seat
+        );
+
+        when(screeningService.getScreening(1L))
+                .thenReturn(screening);
+
+        when(userService.getUser(1L))
+                .thenReturn(user);
+
+        when(seatService.getSeat(seatId))
+                .thenReturn(seat);
 
         assertThrows(
                 InvalidBookingException.class,
                 () -> bookingService.createBooking(booking)
         );
 
-        verify(bookingRepository, never()).save(booking);
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
     void updateBooking_updatesFields() {
-        User oldUser = new User();
-        User newUser = new User();
+        Room room = new Room();
+        room.setId(1L);
 
-        Room oldRoom = new Room();
-        oldRoom.setId(1L);
+        Screening oldScreening = TestDataFactory.createScreening(
+                TestDataFactory.createMovie(),
+                room
+        );
+        oldScreening.setId(1L);
 
-        Room newRoom = new Room();
-        newRoom.setId(2L);
+        Screening newScreening = TestDataFactory.createScreening(
+                TestDataFactory.createMovie(),
+                room
+        );
+        newScreening.setId(2L);
 
-        Screening oldScreening = new Screening();
-        oldScreening.setRoom(oldRoom);
+        User oldUser = TestDataFactory.createUser();
+        oldUser.setId(1L);
 
-        Screening newScreening = new Screening();
-        newScreening.setRoom(newRoom);
+        User newUser = TestDataFactory.createUser(
+                "Updated",
+                "User",
+                "updated@example.com",
+                "hashed-password",
+                Role.USER
+        );
+        newUser.setId(2L);
 
-        Seat oldSeat = new Seat();
-        oldSeat.setRoom(oldRoom);
+        Seat oldSeat = TestDataFactory.createSeat(room, "A1");
+        Seat newSeat = TestDataFactory.createSeat(room, "A2");
 
-        Seat newSeat = new Seat();
-        newSeat.setRoom(newRoom);
-
-        Booking existingBooking = new Booking();
+        Booking existingBooking = TestDataFactory.createBooking(
+                oldScreening,
+                oldUser,
+                oldSeat
+        );
         existingBooking.setId(1L);
-        existingBooking.setUser(oldUser);
-        existingBooking.setScreening(oldScreening);
-        existingBooking.setSeat(oldSeat);
 
-        Booking updatedBooking = new Booking();
+        Booking updatedBooking = TestDataFactory.createBooking(
+                newScreening,
+                newUser,
+                newSeat
+        );
         updatedBooking.setId(1L);
-        updatedBooking.setUser(newUser);
-        updatedBooking.setScreening(newScreening);
-        updatedBooking.setSeat(newSeat);
 
         when(bookingRepository.findById(1L))
                 .thenReturn(Optional.of(existingBooking));
+
+        when(screeningService.getScreening(2L))
+                .thenReturn(newScreening);
+
+        when(userService.getUser(2L))
+                .thenReturn(newUser);
+
+        when(seatService.getSeat(newSeat.getSeatId()))
+                .thenReturn(newSeat);
 
         Booking result = bookingService.updateBooking(updatedBooking);
 
@@ -142,6 +219,10 @@ class BookingServiceTests {
         assertSame(newUser, result.getUser());
         assertSame(newScreening, result.getScreening());
         assertSame(newSeat, result.getSeat());
+
+        verify(screeningService).getScreening(2L);
+        verify(userService).getUser(2L);
+        verify(seatService).getSeat(newSeat.getSeatId());
     }
 
     @Test
@@ -152,22 +233,41 @@ class BookingServiceTests {
         Room seatRoom = new Room();
         seatRoom.setId(2L);
 
-        Screening screening = new Screening();
-        screening.setRoom(screeningRoom);
+        Screening screening = TestDataFactory.createScreening(
+                TestDataFactory.createMovie(),
+                screeningRoom
+        );
+        screening.setId(1L);
 
-        Seat seat = new Seat();
-        seat.setRoom(seatRoom);
+        User user = TestDataFactory.createUser();
+        user.setId(1L);
+
+        Seat seat = TestDataFactory.createSeat(
+                seatRoom,
+                "A1"
+        );
 
         Booking existingBooking = new Booking();
         existingBooking.setId(1L);
 
-        Booking updatedBooking = new Booking();
+        Booking updatedBooking = TestDataFactory.createBooking(
+                screening,
+                user,
+                seat
+        );
         updatedBooking.setId(1L);
-        updatedBooking.setScreening(screening);
-        updatedBooking.setSeat(seat);
 
         when(bookingRepository.findById(1L))
                 .thenReturn(Optional.of(existingBooking));
+
+        when(screeningService.getScreening(1L))
+                .thenReturn(screening);
+
+        when(userService.getUser(1L))
+                .thenReturn(user);
+
+        when(seatService.getSeat(seat.getSeatId()))
+                .thenReturn(seat);
 
         assertThrows(
                 InvalidBookingException.class,
@@ -188,6 +288,12 @@ class BookingServiceTests {
         assertThrows(
                 EntityNotFoundException.class,
                 () -> bookingService.updateBooking(booking)
+        );
+
+        verifyNoInteractions(
+                screeningService,
+                userService,
+                seatService
         );
     }
 

@@ -40,7 +40,10 @@ public final class TestDataFactory {
         return createRoom("Test Room", roomType);
     }
 
-    public static Room createRoom(String name, RoomType roomType) {
+    public static Room createRoom(
+            String name,
+            RoomType roomType
+    ) {
         Room room = new Room();
         room.setName(name);
         room.setRoomType(roomType);
@@ -69,6 +72,19 @@ public final class TestDataFactory {
         screening.setStartTime(startTime);
         screening.setPriceInCents(1000);
         return screening;
+    }
+
+    public static Seat createSeat(
+            Room room,
+            String seatLabel
+    ) {
+        Seat seat = new Seat();
+        seat.setSeatId(new SeatId(
+                seatLabel,
+                room.getId()
+        ));
+        seat.setRoom(room);
+        return seat;
     }
 
     public static User createUser() {
