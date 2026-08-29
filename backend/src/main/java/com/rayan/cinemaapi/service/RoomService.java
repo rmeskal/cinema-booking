@@ -4,8 +4,11 @@ import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.RoomType;
 import com.rayan.cinemaapi.entity.Seat;
 import com.rayan.cinemaapi.entity.SeatId;
+import com.rayan.cinemaapi.exception.EntityInUseException;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.repository.RoomRepository;
+import com.rayan.cinemaapi.repository.ScreeningRepository;
+import com.rayan.cinemaapi.repository.SeatRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,13 +18,17 @@ import java.util.List;
 public class RoomService {
 
     private final RoomRepository roomRepository;
+    private final ScreeningRepository screeningRepository;
+    private final SeatRepository seatRepository;
     private final RoomTypeService roomTypeService;
 
     private static final int SEAT_ROWS = 6;
     private static final int SEATS_PER_ROW = 10;
 
-    public RoomService(RoomRepository roomRepository, RoomTypeService roomTypeService) {
+    public RoomService(RoomRepository roomRepository, ScreeningRepository screeningRepository, SeatRepository seatRepository, RoomTypeService roomTypeService) {
         this.roomRepository = roomRepository;
+        this.screeningRepository = screeningRepository;
+        this.seatRepository = seatRepository;
         this.roomTypeService = roomTypeService;
     }
 
@@ -68,6 +75,14 @@ public class RoomService {
     public void deleteRoom(Long id) {
         if (!roomRepository.existsById(id)) {
             throw new EntityNotFoundException("Room", id);
+        }
+
+        if (screeningRepository.existsByRoomId(id)) {
+            throw new EntityInUseException("Room", id);
+        }
+
+        if (seatRepository.existsByRoomId(id)) {
+            throw new EntityInUseException("Room", id);
         }
 
         roomRepository.deleteById(id);

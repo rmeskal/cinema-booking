@@ -6,6 +6,7 @@ import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.Screening;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.exception.ScreeningOverlapException;
+import com.rayan.cinemaapi.repository.BookingRepository;
 import com.rayan.cinemaapi.repository.ScreeningRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,9 @@ class ScreeningServiceTests {
 
     @Mock
     private ScreeningRepository screeningRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @Mock
     private MovieService movieService;

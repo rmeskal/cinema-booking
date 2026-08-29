@@ -3,6 +3,7 @@ package com.rayan.cinemaapi.service;
 import com.rayan.cinemaapi.entity.Seat;
 import com.rayan.cinemaapi.entity.SeatId;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
+import com.rayan.cinemaapi.repository.BookingRepository;
 import com.rayan.cinemaapi.repository.SeatRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +21,9 @@ class SeatServiceTests {
 
     @Mock
     private SeatRepository seatRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @InjectMocks
     private SeatService seatService;

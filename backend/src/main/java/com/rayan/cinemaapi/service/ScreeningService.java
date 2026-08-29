@@ -3,8 +3,10 @@ package com.rayan.cinemaapi.service;
 import com.rayan.cinemaapi.entity.Movie;
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.Screening;
+import com.rayan.cinemaapi.exception.EntityInUseException;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.exception.ScreeningOverlapException;
+import com.rayan.cinemaapi.repository.BookingRepository;
 import com.rayan.cinemaapi.repository.ScreeningRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +18,13 @@ import java.util.List;
 public class ScreeningService {
 
     private final ScreeningRepository screeningRepository;
+    private final BookingRepository bookingRepository;
     private final MovieService movieService;
     private final RoomService roomService;
 
-    public ScreeningService(ScreeningRepository screeningRepository, MovieService movieService, RoomService roomService) {
+    public ScreeningService(ScreeningRepository screeningRepository, BookingRepository bookingRepository, MovieService movieService, RoomService roomService) {
         this.screeningRepository = screeningRepository;
+        this.bookingRepository = bookingRepository;
         this.movieService = movieService;
         this.roomService = roomService;
     }
@@ -84,6 +88,10 @@ public class ScreeningService {
     public void deleteScreening(Long id) {
         if (!screeningRepository.existsById(id)) {
             throw new EntityNotFoundException("Screening", id);
+        }
+
+        if (bookingRepository.existsByScreeningId(id)) {
+            throw new EntityInUseException("Screening", id);
         }
 
         screeningRepository.deleteById(id);
