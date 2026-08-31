@@ -7,7 +7,6 @@ import com.rayan.cinemaapi.entity.User;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.exception.InvalidBookingException;
 import com.rayan.cinemaapi.repository.BookingRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -47,28 +46,6 @@ public class BookingService {
         resolveBooking(booking);
 
         return bookingRepository.save(booking);
-    }
-
-    @Transactional
-    public Booking updateBooking(Booking booking) {
-        Booking existingBooking = getBooking(booking.getId());
-
-        resolveBooking(booking);
-
-        if (bookingRepository.existsByScreeningAndSeatExcept(
-                booking.getScreening().getId(),
-                booking.getSeat().getSeatId().getSeatLabel(),
-                booking.getSeat().getSeatId().getRoomId(),
-                booking.getId()
-        )) {
-            throw new InvalidBookingException();
-        }
-
-        existingBooking.setUser(booking.getUser());
-        existingBooking.setScreening(booking.getScreening());
-        existingBooking.setSeat(booking.getSeat());
-
-        return existingBooking;
     }
 
     public void deleteBooking(Long id) {

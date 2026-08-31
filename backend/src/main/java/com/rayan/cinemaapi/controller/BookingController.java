@@ -47,17 +47,6 @@ public class BookingController {
         );
     }
 
-    @PutMapping("/{id}")
-    public BookingResponse updateBooking(
-            @PathVariable Long id,
-            @Valid @RequestBody BookingRequest request
-    ) {
-        Booking booking = toEntity(request);
-        booking.setId(id);
-
-        return toResponse(bookingService.updateBooking(booking));
-    }
-
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBooking(@PathVariable Long id) {
