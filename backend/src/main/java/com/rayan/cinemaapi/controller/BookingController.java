@@ -1,0 +1,93 @@
+package com.rayan.cinemaapi.controller;
+
+import com.rayan.cinemaapi.dto.booking.BookingRequest;
+import com.rayan.cinemaapi.dto.booking.BookingResponse;
+import com.rayan.cinemaapi.entity.Booking;
+import com.rayan.cinemaapi.entity.Screening;
+import com.rayan.cinemaapi.entity.Seat;
+import com.rayan.cinemaapi.entity.SeatId;
+import com.rayan.cinemaapi.entity.User;
+import com.rayan.cinemaapi.service.BookingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/bookings")
+@Tag(name = "Bookings", description = "Manage bookings")
+public class BookingController {
+
+    private final BookingService bookingService;
+
+    public BookingController(BookingService bookingService) {
+        this.bookingService = bookingService;
+    }
+
+    @GetMapping
+    @Operation(summary = "Get all bookings")
+    public List<BookingResponse> getBookings() {
+        return bookingService.getBookings()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get a booking by ID")
+    public BookingResponse getBooking(@PathVariable Long id) {
+        return toResponse(bookingService.getBooking(id));
+    }
+
+    @PostMapping
+    @Operation(summary = "Create a booking")
+    @ResponseStatus(HttpStatus.CREATED)
+    public BookingResponse createBooking(
+            @Valid @RequestBody BookingRequest request
+    ) {
+        return toResponse(
+                bookingService.createBooking(toEntity(request))
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a booking")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBooking(@PathVariable Long id) {
+        bookingService.deleteBooking(id);
+    }
+
+    private Booking toEntity(BookingRequest request) {
+        Booking booking = new Booking();
+
+        Screening screening = new Screening();
+        screening.setId(request.screeningId());
+        booking.setScreening(screening);
+
+        User user = new User();
+        user.setId(request.userId());
+        booking.setUser(user);
+
+        Seat seat = new Seat();
+        seat.setSeatId(new SeatId(
+                request.seatLabel(),
+                request.roomId()
+        ));
+        booking.setSeat(seat);
+
+        return booking;
+    }
+
+    private BookingResponse toResponse(Booking booking) {
+        return new BookingResponse(
+                booking.getId(),
+                booking.getScreening().getId(),
+                booking.getUser().getId(),
+                booking.getSeat().getSeatId().getSeatLabel(),
+                booking.getSeat().getSeatId().getRoomId()
+        );
+    }
+}

@@ -44,4 +44,8 @@ public interface ScreeningRepository extends JpaRepository<Screening, Long> {
             @Param("endTime") LocalDateTime endTime,
             @Param("screeningId") Long screeningId
     );
+
+    boolean existsByMovieId(Long id);
+
+    boolean existsByRoomId(Long id);
 }

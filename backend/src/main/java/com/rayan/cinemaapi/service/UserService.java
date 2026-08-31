@@ -1,10 +1,14 @@
 package com.rayan.cinemaapi.service;
 
 import com.rayan.cinemaapi.entity.User;
+import com.rayan.cinemaapi.exception.EntityInUseException;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
+import com.rayan.cinemaapi.repository.BookingRepository;
 import com.rayan.cinemaapi.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import com.rayan.cinemaapi.entity.Role;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -12,9 +16,13 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final BookingRepository bookingRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, BookingRepository bookingRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.bookingRepository = bookingRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<User> getUsers() {
@@ -27,7 +35,10 @@ public class UserService {
         );
     }
 
-    public User createUser(User user) {
+    public User createUser(User user, String password) {
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setRole(Role.USER);
+
         return userRepository.save(user);
     }
 
@@ -43,6 +54,14 @@ public class UserService {
     }
 
     public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new EntityNotFoundException("User", id);
+        }
+
+        if (bookingRepository.existsByUserId(id)) {
+            throw new EntityInUseException("User", id);
+        }
+
         userRepository.deleteById(id);
     }
 }

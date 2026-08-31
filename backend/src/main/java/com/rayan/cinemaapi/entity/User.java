@@ -28,6 +28,14 @@ public class User {
     @Email
     private String email;
 
+    @NotBlank
+    @Column(nullable = false)
+    private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private Set<Booking> bookings = new HashSet<>();
 
@@ -57,6 +65,22 @@ public class User {
 
     public String getEmail() {
         return email;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public void setEmail(String email) {

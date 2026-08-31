@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.*;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.exception.InvalidBookingException;
@@ -21,12 +22,25 @@ class BookingServiceTests {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private ScreeningService screeningService;
+
+    @Mock
+    private UserService userService;
+
+    @Mock
+    private SeatService seatService;
+
     @InjectMocks
     private BookingService bookingService;
 
     @Test
     void getBooking_returnsBookingWhenFound() {
-        Booking booking = new Booking();
+        Booking booking = TestDataFactory.createBooking(
+                new Screening(),
+                new User(),
+                new Seat()
+        );
         booking.setId(1L);
 
         when(bookingRepository.findById(1L))
@@ -53,15 +67,34 @@ class BookingServiceTests {
         Room room = new Room();
         room.setId(1L);
 
-        Screening screening = new Screening();
-        screening.setRoom(room);
+        Movie movie = TestDataFactory.createMovie();
 
-        Seat seat = new Seat();
-        seat.setRoom(room);
+        Screening screening = TestDataFactory.createScreening(
+                movie,
+                room
+        );
+        screening.setId(1L);
 
-        Booking booking = new Booking();
-        booking.setScreening(screening);
-        booking.setSeat(seat);
+        User user = TestDataFactory.createUser();
+        user.setId(1L);
+
+        Seat seat = TestDataFactory.createSeat(room, "A1");
+        SeatId seatId = seat.getSeatId();
+
+        Booking booking = TestDataFactory.createBooking(
+                screening,
+                user,
+                seat
+        );
+
+        when(screeningService.getScreening(1L))
+                .thenReturn(screening);
+
+        when(userService.getUser(1L))
+                .thenReturn(user);
+
+        when(seatService.getSeat(seatId))
+                .thenReturn(seat);
 
         when(bookingRepository.save(booking))
                 .thenReturn(booking);
@@ -69,6 +102,10 @@ class BookingServiceTests {
         Booking result = bookingService.createBooking(booking);
 
         assertSame(booking, result);
+
+        verify(screeningService).getScreening(1L);
+        verify(userService).getUser(1L);
+        verify(seatService).getSeat(seatId);
         verify(bookingRepository).save(booking);
     }
 
@@ -80,121 +117,64 @@ class BookingServiceTests {
         Room seatRoom = new Room();
         seatRoom.setId(2L);
 
-        Screening screening = new Screening();
-        screening.setRoom(screeningRoom);
+        Screening screening = TestDataFactory.createScreening(
+                TestDataFactory.createMovie(),
+                screeningRoom
+        );
+        screening.setId(1L);
 
-        Seat seat = new Seat();
-        seat.setRoom(seatRoom);
+        User user = TestDataFactory.createUser();
+        user.setId(1L);
 
-        Booking booking = new Booking();
-        booking.setScreening(screening);
-        booking.setSeat(seat);
+        Seat seat = TestDataFactory.createSeat(
+                seatRoom,
+                "A1"
+        );
+        SeatId seatId = seat.getSeatId();
+
+        Booking booking = TestDataFactory.createBooking(
+                screening,
+                user,
+                seat
+        );
+
+        when(screeningService.getScreening(1L))
+                .thenReturn(screening);
+
+        when(userService.getUser(1L))
+                .thenReturn(user);
+
+        when(seatService.getSeat(seatId))
+                .thenReturn(seat);
 
         assertThrows(
                 InvalidBookingException.class,
                 () -> bookingService.createBooking(booking)
         );
 
-        verify(bookingRepository, never()).save(booking);
-    }
-
-    @Test
-    void updateBooking_updatesFields() {
-        User oldUser = new User();
-        User newUser = new User();
-
-        Room oldRoom = new Room();
-        oldRoom.setId(1L);
-
-        Room newRoom = new Room();
-        newRoom.setId(2L);
-
-        Screening oldScreening = new Screening();
-        oldScreening.setRoom(oldRoom);
-
-        Screening newScreening = new Screening();
-        newScreening.setRoom(newRoom);
-
-        Seat oldSeat = new Seat();
-        oldSeat.setRoom(oldRoom);
-
-        Seat newSeat = new Seat();
-        newSeat.setRoom(newRoom);
-
-        Booking existingBooking = new Booking();
-        existingBooking.setId(1L);
-        existingBooking.setUser(oldUser);
-        existingBooking.setScreening(oldScreening);
-        existingBooking.setSeat(oldSeat);
-
-        Booking updatedBooking = new Booking();
-        updatedBooking.setId(1L);
-        updatedBooking.setUser(newUser);
-        updatedBooking.setScreening(newScreening);
-        updatedBooking.setSeat(newSeat);
-
-        when(bookingRepository.findById(1L))
-                .thenReturn(Optional.of(existingBooking));
-
-        Booking result = bookingService.updateBooking(updatedBooking);
-
-        assertSame(existingBooking, result);
-        assertSame(newUser, result.getUser());
-        assertSame(newScreening, result.getScreening());
-        assertSame(newSeat, result.getSeat());
-    }
-
-    @Test
-    void updateBooking_throwsExceptionWhenSeatDoesNotBelongToScreeningRoom() {
-        Room screeningRoom = new Room();
-        screeningRoom.setId(1L);
-
-        Room seatRoom = new Room();
-        seatRoom.setId(2L);
-
-        Screening screening = new Screening();
-        screening.setRoom(screeningRoom);
-
-        Seat seat = new Seat();
-        seat.setRoom(seatRoom);
-
-        Booking existingBooking = new Booking();
-        existingBooking.setId(1L);
-
-        Booking updatedBooking = new Booking();
-        updatedBooking.setId(1L);
-        updatedBooking.setScreening(screening);
-        updatedBooking.setSeat(seat);
-
-        when(bookingRepository.findById(1L))
-                .thenReturn(Optional.of(existingBooking));
-
-        assertThrows(
-                InvalidBookingException.class,
-                () -> bookingService.updateBooking(updatedBooking)
-        );
-
         verify(bookingRepository, never()).save(any());
     }
 
     @Test
-    void updateBooking_throwsExceptionWhenNotFound() {
-        Booking booking = new Booking();
-        booking.setId(1L);
-
-        when(bookingRepository.findById(1L))
-                .thenReturn(Optional.empty());
-
-        assertThrows(
-                EntityNotFoundException.class,
-                () -> bookingService.updateBooking(booking)
-        );
-    }
-
-    @Test
     void deleteBooking_deletesBookingById() {
+        when(bookingRepository.existsById(1L))
+                .thenReturn(true);
+
         bookingService.deleteBooking(1L);
 
         verify(bookingRepository).deleteById(1L);
+    }
+
+    @Test
+    void deleteBooking_throwsExceptionWhenBookingDoesNotExist() {
+        when(bookingRepository.existsById(1L))
+                .thenReturn(false);
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> bookingService.deleteBooking(1L)
+        );
+
+        verify(bookingRepository, never()).deleteById(1L);
     }
 }

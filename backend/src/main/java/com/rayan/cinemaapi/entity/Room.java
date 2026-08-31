@@ -1,6 +1,7 @@
 package com.rayan.cinemaapi.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.HashSet;
@@ -13,6 +14,10 @@ public class Room {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @NotBlank
+    @Column(nullable = false, unique = true)
+    private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @NotNull
@@ -31,6 +36,14 @@ public class Room {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public RoomType getRoomType() {
