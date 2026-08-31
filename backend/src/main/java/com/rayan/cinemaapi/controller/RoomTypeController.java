@@ -4,6 +4,8 @@ import com.rayan.cinemaapi.dto.roomtype.RoomTypeRequest;
 import com.rayan.cinemaapi.dto.roomtype.RoomTypeResponse;
 import com.rayan.cinemaapi.entity.RoomType;
 import com.rayan.cinemaapi.service.RoomTypeService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +14,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/room-types")
+@Tag(name = "Room Types", description = "Manage room types")
 public class RoomTypeController {
 
     private final RoomTypeService roomTypeService;
@@ -21,6 +24,7 @@ public class RoomTypeController {
     }
 
     @GetMapping
+    @Operation(summary = "Get all room types")
     public List<RoomTypeResponse> getRoomTypes() {
         return roomTypeService.getRoomTypes()
                 .stream()
@@ -29,11 +33,13 @@ public class RoomTypeController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a room type by ID")
     public RoomTypeResponse getRoomType(@PathVariable Long id) {
         return toResponse(roomTypeService.getRoomType(id));
     }
 
     @PostMapping
+    @Operation(summary = "Create a room type")
     @ResponseStatus(HttpStatus.CREATED)
     public RoomTypeResponse createRoomType(
             @Valid @RequestBody RoomTypeRequest request
@@ -44,6 +50,7 @@ public class RoomTypeController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a room type")
     public RoomTypeResponse updateRoomType(
             @PathVariable Long id,
             @Valid @RequestBody RoomTypeRequest request
@@ -55,6 +62,7 @@ public class RoomTypeController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a room type")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteRoomType(@PathVariable Long id) {
         roomTypeService.deleteRoomType(id);

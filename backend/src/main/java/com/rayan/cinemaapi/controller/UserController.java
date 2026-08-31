@@ -5,6 +5,8 @@ import com.rayan.cinemaapi.dto.user.UserResponse;
 import com.rayan.cinemaapi.dto.user.UserUpdateRequest;
 import com.rayan.cinemaapi.entity.User;
 import com.rayan.cinemaapi.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
+@Tag(name = "Users", description = "Manage users")
 public class UserController {
 
     private final UserService userService;
@@ -22,6 +25,7 @@ public class UserController {
     }
 
     @GetMapping
+    @Operation(summary = "Get all users")
     public List<UserResponse> getUsers() {
         return userService.getUsers()
                 .stream()
@@ -30,11 +34,13 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a user by ID")
     public UserResponse getUser(@PathVariable Long id) {
         return toResponse(userService.getUser(id));
     }
 
     @PostMapping
+    @Operation(summary = "Create a user")
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse createUser(@Valid @RequestBody UserCreateRequest request) {
         return toResponse(
@@ -43,6 +49,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a user")
     public UserResponse updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UserUpdateRequest request
@@ -54,6 +61,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a user")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);

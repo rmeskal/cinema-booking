@@ -8,6 +8,8 @@ import com.rayan.cinemaapi.entity.Seat;
 import com.rayan.cinemaapi.entity.SeatId;
 import com.rayan.cinemaapi.entity.User;
 import com.rayan.cinemaapi.service.BookingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/bookings")
+@Tag(name = "Bookings", description = "Manage bookings")
 public class BookingController {
 
     private final BookingService bookingService;
@@ -25,6 +28,7 @@ public class BookingController {
     }
 
     @GetMapping
+    @Operation(summary = "Get all bookings")
     public List<BookingResponse> getBookings() {
         return bookingService.getBookings()
                 .stream()
@@ -33,11 +37,13 @@ public class BookingController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a booking by ID")
     public BookingResponse getBooking(@PathVariable Long id) {
         return toResponse(bookingService.getBooking(id));
     }
 
     @PostMapping
+    @Operation(summary = "Create a booking")
     @ResponseStatus(HttpStatus.CREATED)
     public BookingResponse createBooking(
             @Valid @RequestBody BookingRequest request
@@ -48,6 +54,7 @@ public class BookingController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a booking")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteBooking(@PathVariable Long id) {
         bookingService.deleteBooking(id);
