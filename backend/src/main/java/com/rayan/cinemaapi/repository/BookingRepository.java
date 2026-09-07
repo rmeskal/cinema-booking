@@ -23,4 +23,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("seatLabel") String seatLabel,
             @Param("roomId") Long roomId
     );
+
+    @Query(value = """
+    SELECT EXISTS (
+        SELECT 1
+        FROM bookings
+        WHERE screening_id = :screeningId
+          AND seat_label = :seatLabel
+          AND room_id = :roomId
+    )
+    """, nativeQuery = true)
+    boolean existsByScreeningAndSeat(
+            @Param("screeningId") Long screeningId,
+            @Param("seatLabel") String seatLabel,
+            @Param("roomId") Long roomId
+    );
 }
