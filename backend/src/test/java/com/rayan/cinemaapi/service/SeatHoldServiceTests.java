@@ -25,6 +25,12 @@ class SeatHoldServiceTests {
             new GenericContainer<>(DockerImageName.parse("redis:latest"))
                     .withExposedPorts(6379);
 
+    @DynamicPropertySource
+    static void redisProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+    }
+
     @Autowired
     private SeatHoldService seatHoldService;
 
@@ -39,17 +45,12 @@ class SeatHoldServiceTests {
                 .flushDb();
     }
 
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
-    }
-
     @Test
     void holdSeat_shouldSuccessfullyHoldAvailableSeat() {
         boolean result = seatHoldService.holdSeat(1L, "A5", 10L);
 
         assertTrue(result);
+        assertTrue(seatHoldService.isHeld(1L, "A5"));
         assertEquals(
                 "10",
                 redisTemplate.opsForValue().get("seat-hold:1:A5")
@@ -63,6 +64,30 @@ class SeatHoldServiceTests {
         boolean result = seatHoldService.holdSeat(1L, "A5", 20L);
 
         assertFalse(result);
+        assertEquals(
+                "10",
+                redisTemplate.opsForValue().get("seat-hold:1:A5")
+        );
+    }
+
+    @Test
+    void releaseSeat_shouldReleaseHoldWhenUserOwnsIt() {
+        assertTrue(seatHoldService.holdSeat(1L, "A5", 10L));
+
+        boolean result = seatHoldService.releaseSeat(1L, "A5", 10L);
+
+        assertTrue(result);
+        assertFalse(seatHoldService.isHeld(1L, "A5"));
+    }
+
+    @Test
+    void releaseSeat_shouldNotReleaseHoldWhenUserDoesNotOwnIt() {
+        assertTrue(seatHoldService.holdSeat(1L, "A5", 10L));
+
+        boolean result = seatHoldService.releaseSeat(1L, "A5", 20L);
+
+        assertFalse(result);
+        assertTrue(seatHoldService.isHeld(1L, "A5"));
         assertEquals(
                 "10",
                 redisTemplate.opsForValue().get("seat-hold:1:A5")
