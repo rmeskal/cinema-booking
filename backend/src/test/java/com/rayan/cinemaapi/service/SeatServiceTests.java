@@ -2,6 +2,9 @@ package com.rayan.cinemaapi.service;
 
 import com.rayan.cinemaapi.entity.Seat;
 import com.rayan.cinemaapi.entity.SeatId;
+import com.rayan.cinemaapi.entity.Room;
+import com.rayan.cinemaapi.entity.Screening;
+import com.rayan.cinemaapi.entity.SeatStatus;
 import com.rayan.cinemaapi.exception.EntityNotFoundException;
 import com.rayan.cinemaapi.repository.BookingRepository;
 import com.rayan.cinemaapi.repository.SeatRepository;
@@ -12,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,8 +29,39 @@ class SeatServiceTests {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private ScreeningService screeningService;
+
+    @Mock
+    private SeatHoldService seatHoldService;
+
     @InjectMocks
     private SeatService seatService;
+
+    @Test
+    void getSeatAvailability_checksBookingsBeforeHolds() {
+        Room room = new Room();
+        room.setId(2L);
+        Screening screening = new Screening();
+        screening.setRoom(room);
+        Seat booked = new Seat();
+        booked.setSeatId(new SeatId("A1", 2L));
+        Seat held = new Seat();
+        held.setSeatId(new SeatId("A2", 2L));
+        Seat available = new Seat();
+        available.setSeatId(new SeatId("A3", 2L));
+        when(screeningService.getScreening(1L)).thenReturn(screening);
+        when(seatRepository.findAllByRoomId(2L)).thenReturn(List.of(booked, held, available));
+        when(bookingRepository.existsByScreeningAndSeat(1L, "A1", 2L)).thenReturn(true);
+        when(seatHoldService.isHeld(1L, "A2")).thenReturn(true);
+
+        var result = seatService.getSeatAvailability(1L);
+
+        assertEquals(List.of(SeatStatus.BOOKED, SeatStatus.HELD, SeatStatus.AVAILABLE),
+                result.stream().map(seat -> seat.status()).toList());
+        verify(seatHoldService, never()).isHeld(1L, "A1");
+        verify(seatHoldService).isHeld(1L, "A3");
+    }
 
     @Test
     void getSeat_returnsSeatWhenFound() {
