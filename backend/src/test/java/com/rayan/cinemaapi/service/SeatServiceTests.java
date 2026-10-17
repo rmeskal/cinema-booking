@@ -35,6 +35,9 @@ class SeatServiceTests {
     @Mock
     private SeatHoldService seatHoldService;
 
+    @Mock
+    private UserService userService;
+
     @InjectMocks
     private SeatService seatService;
 

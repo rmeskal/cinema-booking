@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -146,6 +147,22 @@ class SeatHoldServiceTests {
     }
 
     @Test
+    void getHoldExpiresAt_shouldReturnOnlyCurrentOwnersExpiryWithoutRenewal() {
+        Instant before = Instant.now();
+        assertTrue(seatHoldService.holdSeat(1L, "A5", 10L));
+
+        Instant expiresAt = seatHoldService.getHoldExpiresAt(1L, "A5", 10L).orElseThrow();
+
+        assertTrue(expiresAt.isAfter(before));
+        assertFalse(expiresAt.isAfter(Instant.now().plusSeconds(30)));
+        assertEquals(expiresAt, seatHoldService.getHoldExpiresAt(1L, "A5", 10L).orElseThrow());
+        assertTrue(seatHoldService.getHoldExpiresAt(1L, "A5", 20L).isEmpty());
+        assertTrue(seatHoldService.getHoldExpiresAt(2L, "A5", 10L).isEmpty());
+        assertTrue(seatHoldService.releaseSeat(1L, "A5", 10L));
+        assertTrue(seatHoldService.getHoldExpiresAt(1L, "A5", 10L).isEmpty());
+    }
+
+    @Test
     void releaseSeat_shouldReturnFalseWhenNoHoldExists() {
         assertFalse(seatHoldService.releaseSeat(1L, "A5", 10L));
     }
@@ -181,10 +198,12 @@ class SeatHoldServiceTests {
 
         assertFalse(seatHoldService.isHeldByUser(1L, "A5", 10L));
         assertFalse(seatHoldService.releaseSeat(1L, "A5", 10L));
+        assertTrue(seatHoldService.getHoldExpiresAt(1L, "A5", 10L).isEmpty());
         assertTrue(seatHoldService.holdSeat(1L, "A5", 20L));
 
         assertFalse(seatHoldService.releaseSeat(1L, "A5", 10L));
         assertTrue(seatHoldService.isHeldByUser(1L, "A5", 20L));
+        assertTrue(seatHoldService.getHoldExpiresAt(1L, "A5", 10L).isEmpty());
     }
 
     @Test

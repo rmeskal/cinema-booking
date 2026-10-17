@@ -1,11 +1,18 @@
 package com.rayan.cinemaapi.service;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class SeatHoldService {
@@ -52,6 +59,32 @@ public class SeatHoldService {
         String holdingUserId = redisTemplate.opsForValue().get(key);
 
         return String.valueOf(userId).equals(holdingUserId);
+    }
+
+    /** Returns Redis's absolute expiry only for this user's active hold. */
+    public Optional<Instant> getHoldExpiresAt(Long screeningId, String seatLabel, Long userId) {
+        String key = createKey(screeningId, seatLabel);
+        // SessionCallback keeps these commands on the same connection. EXEC reads
+        // the owner, remaining TTL and Redis time together, without other clients
+        // replacing the hold between reads. Redis time avoids application clock skew.
+        List<Object> results = redisTemplate.execute(new SessionCallback<>() {
+            @Override
+            public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
+                operations.multi();
+                redisTemplate.opsForValue().get(key);
+                redisTemplate.getExpire(key, TimeUnit.MILLISECONDS);
+                redisTemplate.execute((RedisCallback<Long>) connection ->
+                        connection.serverCommands().time(TimeUnit.MILLISECONDS));
+                return operations.exec();
+            }
+        });
+
+        if (results == null || !String.valueOf(userId).equals(results.get(0))) {
+            return Optional.empty();
+        }
+        long ttl = (Long) results.get(1);
+        long redisTime = (Long) results.get(2);
+        return ttl > 0 ? Optional.of(Instant.ofEpochMilli(redisTime + ttl)) : Optional.empty();
     }
 
     /**
