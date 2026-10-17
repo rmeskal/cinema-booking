@@ -19,11 +19,14 @@ public class SeatService {
     private final SeatRepository seatRepository;
     private final BookingRepository bookingRepository;
     private final ScreeningService screeningService;
+    private final SeatHoldService seatHoldService;
 
-    public SeatService(SeatRepository seatRepository, BookingRepository bookingRepository, ScreeningService screeningService) {
+    public SeatService(SeatRepository seatRepository, BookingRepository bookingRepository,
+                       ScreeningService screeningService, SeatHoldService seatHoldService) {
         this.seatRepository = seatRepository;
         this.bookingRepository = bookingRepository;
         this.screeningService = screeningService;
+        this.seatHoldService = seatHoldService;
     }
 
     public List<Seat> getSeats() {
@@ -67,7 +70,14 @@ public class SeatService {
                             roomId
                     );
 
-                    SeatStatus status = booked ? SeatStatus.BOOKED : SeatStatus.AVAILABLE;
+                    SeatStatus status;
+                    if (booked) {
+                        status = SeatStatus.BOOKED;
+                    } else if (seatHoldService.isHeld(screeningId, seatId.getSeatLabel())) {
+                        status = SeatStatus.HELD;
+                    } else {
+                        status = SeatStatus.AVAILABLE;
+                    }
 
                     return new SeatAvailabilityResponse(
                             seatId.getSeatLabel(),
