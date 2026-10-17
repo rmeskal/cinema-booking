@@ -4,6 +4,10 @@ import com.rayan.cinemaapi.dto.error.ErrorResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -45,6 +49,19 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(),
                 "Request body is invalid."
         );
+    }
+
+    @ExceptionHandler({HandlerMethodValidationException.class, MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class, HttpMessageNotReadableException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidRequest(Exception exception) {
+        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Request parameters or body are invalid.");
+    }
+
+    @ExceptionHandler(SeatHoldConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleSeatHoldConflict(SeatHoldConflictException exception) {
+        return new ErrorResponse(HttpStatus.CONFLICT.value(), exception.getMessage());
     }
 
     @ExceptionHandler(EntityInUseException.class)
