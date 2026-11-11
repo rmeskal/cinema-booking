@@ -2,13 +2,19 @@ package com.rayan.cinemaapi.controller;
 
 import com.rayan.cinemaapi.dto.screening.ScreeningRequest;
 import com.rayan.cinemaapi.dto.screening.ScreeningResponse;
+import com.rayan.cinemaapi.dto.seat.SeatAvailabilityResponse;
+import com.rayan.cinemaapi.dto.seat.SeatHoldRequest;
+import com.rayan.cinemaapi.dto.seat.SeatHoldResponse;
 import com.rayan.cinemaapi.entity.Movie;
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.Screening;
 import com.rayan.cinemaapi.service.ScreeningService;
+import com.rayan.cinemaapi.service.SeatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,9 +26,11 @@ import java.util.List;
 public class ScreeningController {
 
     private final ScreeningService screeningService;
+    private final SeatService seatService;
 
-    public ScreeningController(ScreeningService screeningService) {
+    public ScreeningController(ScreeningService screeningService, SeatService seatService) {
         this.screeningService = screeningService;
+        this.seatService = seatService;
     }
 
     @GetMapping
@@ -64,6 +72,36 @@ public class ScreeningController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteScreening(@PathVariable Long id) {
         screeningService.deleteScreening(id);
+    }
+
+    @GetMapping("/{id}/seats")
+    @Operation(summary = "Get seat availability for a screening")
+    public List<SeatAvailabilityResponse> getSeatAvailability(
+            @PathVariable Long id
+    ) {
+        return seatService.getSeatAvailability(id);
+    }
+
+    @PostMapping("/{id}/seats/{seatLabel}/hold")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Temporarily hold a seat; repeated requests do not renew the hold")
+    public SeatHoldResponse holdSeat(
+            @PathVariable @Positive Long id,
+            @PathVariable @NotBlank String seatLabel,
+            @Valid @RequestBody SeatHoldRequest request
+    ) {
+        return seatService.holdSeat(id, seatLabel, request.userId());
+    }
+
+    @DeleteMapping("/{id}/seats/{seatLabel}/hold")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Release a user's seat hold; absent holds are already released")
+    public void releaseSeatHold(
+            @PathVariable @Positive Long id,
+            @PathVariable @NotBlank String seatLabel,
+            @RequestParam @Positive Long userId
+    ) {
+        seatService.releaseSeatHold(id, seatLabel, userId);
     }
 
     private Screening toEntity(ScreeningRequest request) {

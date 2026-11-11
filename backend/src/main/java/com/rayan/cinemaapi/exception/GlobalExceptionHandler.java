@@ -1,15 +1,29 @@
 package com.rayan.cinemaapi.exception;
 
 import com.rayan.cinemaapi.dto.error.ErrorResponse;
+import io.lettuce.core.RedisCommandTimeoutException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler({RedisConnectionFailureException.class, RedisSystemException.class, RedisCommandTimeoutException.class})
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse handleRedisUnavailable(Exception exception) {
+        return new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "Seat reservation service is temporarily unavailable. Please retry.");
+    }
 
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -45,6 +59,19 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value(),
                 "Request body is invalid."
         );
+    }
+
+    @ExceptionHandler({HandlerMethodValidationException.class, MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class, HttpMessageNotReadableException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidRequest(Exception exception) {
+        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Request parameters or body are invalid.");
+    }
+
+    @ExceptionHandler(SeatHoldConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleSeatHoldConflict(SeatHoldConflictException exception) {
+        return new ErrorResponse(HttpStatus.CONFLICT.value(), exception.getMessage());
     }
 
     @ExceptionHandler(EntityInUseException.class)

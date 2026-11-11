@@ -10,6 +10,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
 
@@ -30,6 +32,9 @@ class BookingServiceTests {
 
     @Mock
     private SeatService seatService;
+
+    @Mock
+    private SeatHoldService seatHoldService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -96,17 +101,28 @@ class BookingServiceTests {
         when(seatService.getSeat(seatId))
                 .thenReturn(seat);
 
-        when(bookingRepository.save(booking))
+        when(bookingRepository.saveAndFlush(booking))
                 .thenReturn(booking);
+        when(seatHoldService.claimForBooking(1L, "A1", 1L)).thenReturn("marker");
 
-        Booking result = bookingService.createBooking(booking);
-
-        assertSame(booking, result);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            Booking result = bookingService.createBooking(booking);
+            assertSame(booking, result);
+            verify(seatHoldService, never()).completeBookingHold(any(), any(), any(), anyBoolean());
+            var synchronization = TransactionSynchronizationManager.getSynchronizations().getFirst();
+            synchronization.beforeCommit(false);
+            synchronization.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+            verify(seatHoldService).verifyBookingHold(1L, "A1", "marker");
+            verify(seatHoldService).completeBookingHold(1L, "A1", "marker", true);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
 
         verify(screeningService).getScreening(1L);
         verify(userService).getUser(1L);
         verify(seatService).getSeat(seatId);
-        verify(bookingRepository).save(booking);
+        verify(bookingRepository).saveAndFlush(booking);
     }
 
     @Test
@@ -152,7 +168,7 @@ class BookingServiceTests {
                 () -> bookingService.createBooking(booking)
         );
 
-        verify(bookingRepository, never()).save(any());
+        verify(bookingRepository, never()).saveAndFlush(any());
     }
 
     @Test
