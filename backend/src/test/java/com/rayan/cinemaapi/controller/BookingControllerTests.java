@@ -15,6 +15,7 @@ import com.rayan.cinemaapi.repository.RoomTypeRepository;
 import com.rayan.cinemaapi.repository.ScreeningRepository;
 import com.rayan.cinemaapi.repository.SeatRepository;
 import com.rayan.cinemaapi.repository.UserRepository;
+import com.rayan.cinemaapi.service.SeatHoldService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -39,6 +41,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class BookingControllerTests {
+
+    // These tests cover request validation and mapping. BookingFlowTests exercises
+    // real Redis ownership checks and real transaction completion separately.
+    @MockitoBean
+    private SeatHoldService seatHoldService;
 
     @Autowired
     private MockMvc mockMvc;

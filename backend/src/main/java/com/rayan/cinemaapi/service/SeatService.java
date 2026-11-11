@@ -12,6 +12,7 @@ import com.rayan.cinemaapi.exception.SeatHoldConflictException;
 import com.rayan.cinemaapi.repository.BookingRepository;
 import com.rayan.cinemaapi.repository.SeatRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -94,6 +95,7 @@ public class SeatService {
                 .toList();
     }
 
+    @Transactional
     public SeatHoldResponse holdSeat(Long screeningId, String seatLabel, Long userId) {
         SeatId seatId = validateSeatHoldRequest(screeningId, seatLabel, userId);
         if (bookingRepository.existsByScreeningAndSeat(screeningId, seatLabel, seatId.getRoomId())) {
@@ -109,6 +111,7 @@ public class SeatService {
         return new SeatHoldResponse(screeningId, seatLabel, seatId.getRoomId(), userId, expiresAt);
     }
 
+    @Transactional
     public void releaseSeatHold(Long screeningId, String seatLabel, Long userId) {
         validateSeatHoldRequest(screeningId, seatLabel, userId);
         if (!seatHoldService.releaseSeat(screeningId, seatLabel, userId)
@@ -124,6 +127,17 @@ public class SeatService {
         // Seats have composite IDs. Deriving the room from the screening ensures
         // that a seat from a different room can never be held through this endpoint.
         SeatId seatId = new SeatId(seatLabel, screening.getRoom().getId());
-        return getSeat(seatId).getSeatId();
+        prepareSeatForBooking(screeningId, seatId);
+        return seatId;
+    }
+
+    // Caller must have a SQL transaction. All hold mutations and booking creation
+    // take this same lock, including across application instances.
+    public void prepareSeatForBooking(Long screeningId, SeatId seatId) {
+        seatRepository.findByIdForUpdate(seatId).orElseThrow(
+                () -> new EntityNotFoundException("Seat", seatId));
+        seatHoldService.recoverBookingHold(screeningId, seatId.getSeatLabel(),
+                bookingRepository.existsByScreeningAndSeat(
+                        screeningId, seatId.getSeatLabel(), seatId.getRoomId()));
     }
 }

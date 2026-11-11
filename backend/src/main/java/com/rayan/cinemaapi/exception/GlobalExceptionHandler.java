@@ -1,7 +1,10 @@
 package com.rayan.cinemaapi.exception;
 
 import com.rayan.cinemaapi.dto.error.ErrorResponse;
+import io.lettuce.core.RedisCommandTimeoutException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -14,6 +17,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler({RedisConnectionFailureException.class, RedisSystemException.class, RedisCommandTimeoutException.class})
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse handleRedisUnavailable(Exception exception) {
+        return new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "Seat reservation service is temporarily unavailable. Please retry.");
+    }
 
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)

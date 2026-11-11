@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -35,6 +36,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.*;
@@ -111,7 +113,7 @@ class SeatHoldControllerTests {
 
     @Test
     void holdSeat_returnsCreatedWithActualRedisExpiry() throws Exception {
-        Instant before = Instant.now();
+        Instant before = redisNow();
 
         String response = acquire(screening.getId(), "A1", user.getId())
                 .andExpect(status().isCreated())
@@ -125,7 +127,7 @@ class SeatHoldControllerTests {
         Instant expiresAt = Instant.parse(JsonPath.read(response, "$.expiresAt"));
         assertEquals(expiresAt, seatHoldService.getHoldExpiresAt(screening.getId(), "A1", user.getId()).orElseThrow());
         assertTrue(expiresAt.isAfter(before));
-        assertFalse(expiresAt.isAfter(Instant.now().plusSeconds(30)));
+        assertFalse(expiresAt.isAfter(redisNow().plusSeconds(30)));
         assertTrue(seatHoldService.isHeldByUser(screening.getId(), "A1", user.getId()));
     }
 
@@ -300,5 +302,10 @@ class SeatHoldControllerTests {
 
     private String key() {
         return "seat-hold:" + screening.getId() + ":A1";
+    }
+
+    private Instant redisNow() {
+        return redisTemplate.execute((RedisCallback<Instant>) connection ->
+                Instant.ofEpochMilli(connection.serverCommands().time(TimeUnit.MILLISECONDS)));
     }
 }

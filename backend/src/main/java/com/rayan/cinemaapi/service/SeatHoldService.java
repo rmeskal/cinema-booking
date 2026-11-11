@@ -1,10 +1,12 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.exception.SeatHoldConflictException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.types.Expiration;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
@@ -12,11 +14,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
 public class SeatHoldService {
 
+    private static final String CONFIRMING_PREFIX = "confirming:";
     private final RedisTemplate<String, String> redisTemplate;
     private final Duration holdDuration;
 
@@ -95,6 +99,50 @@ public class SeatHoldService {
         String key = createKey(screeningId, seatLabel);
 
         return Boolean.TRUE.equals(redisTemplate.compareAndDelete(key, String.valueOf(userId)));
+    }
+
+    // The caller holds the PostgreSQL seat lock until the booking transaction ends.
+    // SET IFEQ replaces only an active hold belonging to this user and removes its
+    // TTL atomically. A unique value prevents delayed cleanup deleting a later hold.
+    String claimForBooking(Long screeningId, String seatLabel, Long userId) {
+        Instant expiresAt = getHoldExpiresAt(screeningId, seatLabel, userId)
+                .orElseThrow(() -> new SeatHoldConflictException(
+                        "An active seat hold belonging to this user is required."));
+        String marker = CONFIRMING_PREFIX + userId + ":" + expiresAt.toEpochMilli() + ":" + UUID.randomUUID();
+        if (!Boolean.TRUE.equals(redisTemplate.opsForValue().compareAndSet(
+                createKey(screeningId, seatLabel), String.valueOf(userId), marker))) {
+            throw new SeatHoldConflictException("Seat hold expired or changed before confirmation.");
+        }
+        return marker;
+    }
+
+    void completeBookingHold(Long screeningId, String seatLabel, String marker, boolean committed) {
+        String key = createKey(screeningId, seatLabel);
+        if (committed) {
+            redisTemplate.compareAndDelete(key, marker);
+        } else {
+            String[] parts = marker.split(":");
+            // PXAT restores the original deadline using Redis's clock. If it has
+            // already passed, Redis immediately expires the restored hold.
+            redisTemplate.opsForValue().set(key, parts[1], spec -> spec.ifEquals().value(marker)
+                    .expiration(Expiration.unixTimestamp(Long.parseLong(parts[2]), TimeUnit.MILLISECONDS)));
+        }
+    }
+
+    void verifyBookingHold(Long screeningId, String seatLabel, String marker) {
+        if (!marker.equals(redisTemplate.opsForValue().get(createKey(screeningId, seatLabel)))) {
+            throw new SeatHoldConflictException("Seat hold changed during booking confirmation.");
+        }
+    }
+
+    // Only call while holding the SQL seat lock. Acquiring that lock proves the
+    // previous SQL transaction has finished (or crashed). PostgreSQL decides recovery,
+    // including when a Redis write succeeded but its response was lost.
+    void recoverBookingHold(Long screeningId, String seatLabel, boolean booked) {
+        String marker = redisTemplate.opsForValue().get(createKey(screeningId, seatLabel));
+        if (marker != null && marker.startsWith(CONFIRMING_PREFIX)) {
+            completeBookingHold(screeningId, seatLabel, marker, booked);
+        }
     }
 
     private String createKey(Long screeningId, String seatLabel) {

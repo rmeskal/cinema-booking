@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -148,13 +149,13 @@ class SeatHoldServiceTests {
 
     @Test
     void getHoldExpiresAt_shouldReturnOnlyCurrentOwnersExpiryWithoutRenewal() {
-        Instant before = Instant.now();
+        Instant before = redisNow();
         assertTrue(seatHoldService.holdSeat(1L, "A5", 10L));
 
         Instant expiresAt = seatHoldService.getHoldExpiresAt(1L, "A5", 10L).orElseThrow();
 
         assertTrue(expiresAt.isAfter(before));
-        assertFalse(expiresAt.isAfter(Instant.now().plusSeconds(30)));
+        assertFalse(expiresAt.isAfter(redisNow().plusSeconds(30)));
         assertEquals(expiresAt, seatHoldService.getHoldExpiresAt(1L, "A5", 10L).orElseThrow());
         assertTrue(seatHoldService.getHoldExpiresAt(1L, "A5", 20L).isEmpty());
         assertTrue(seatHoldService.getHoldExpiresAt(2L, "A5", 10L).isEmpty());
@@ -165,6 +166,33 @@ class SeatHoldServiceTests {
     @Test
     void releaseSeat_shouldReturnFalseWhenNoHoldExists() {
         assertFalse(seatHoldService.releaseSeat(1L, "A5", 10L));
+    }
+
+    @Test
+    void delayedConfirmationCleanup_doesNotDeleteNewHoldEvenForSameUser() {
+        assertTrue(seatHoldService.holdSeat(1L, "A5", 10L));
+        String marker = seatHoldService.claimForBooking(1L, "A5", 10L);
+        seatHoldService.completeBookingHold(1L, "A5", marker, true);
+        assertTrue(seatHoldService.holdSeat(1L, "A5", 10L));
+
+        seatHoldService.completeBookingHold(1L, "A5", marker, true);
+        seatHoldService.completeBookingHold(1L, "A5", marker, false);
+
+        assertTrue(seatHoldService.isHeldByUser(1L, "A5", 10L));
+        assertTrue(redisTemplate.getExpire("seat-hold:1:A5", TimeUnit.MILLISECONDS) > 0);
+    }
+
+    @Test
+    void recoveryOfExpiredConfirmation_doesNotRenewOriginalHold() throws InterruptedException {
+        SeatHoldService shortHolds = new SeatHoldService(redisTemplate, Duration.ofMillis(300));
+        assertTrue(shortHolds.holdSeat(1L, "A5", 10L));
+        shortHolds.claimForBooking(1L, "A5", 10L);
+        Thread.sleep(350);
+
+        shortHolds.recoverBookingHold(1L, "A5", false);
+
+        assertFalse(shortHolds.isHeld(1L, "A5"));
+        assertTrue(shortHolds.holdSeat(1L, "A5", 20L));
     }
 
     @Test
@@ -258,5 +286,10 @@ class SeatHoldServiceTests {
             Thread.sleep(10);
         }
         assertFalse(seatHoldService.isHeld(screeningId, seatLabel), "Hold should expire in Redis");
+    }
+
+    private Instant redisNow() {
+        return redisTemplate.execute((RedisCallback<Instant>) connection ->
+                Instant.ofEpochMilli(connection.serverCommands().time(TimeUnit.MILLISECONDS)));
     }
 }
