@@ -3,7 +3,6 @@ package com.rayan.cinemaapi.controller;
 import com.rayan.cinemaapi.dto.screening.ScreeningRequest;
 import com.rayan.cinemaapi.dto.screening.ScreeningResponse;
 import com.rayan.cinemaapi.dto.seat.SeatAvailabilityResponse;
-import com.rayan.cinemaapi.dto.seat.SeatHoldRequest;
 import com.rayan.cinemaapi.dto.seat.SeatHoldResponse;
 import com.rayan.cinemaapi.entity.Movie;
 import com.rayan.cinemaapi.entity.Room;
@@ -18,6 +17,7 @@ import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -84,24 +84,26 @@ public class ScreeningController {
 
     @PostMapping("/{id}/seats/{seatLabel}/hold")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Temporarily hold a seat; repeated requests do not renew the hold")
+    @Operation(summary = "Temporarily hold a seat for the signed-in user",
+            description = "No request body is needed. Repeated requests do not renew the hold.")
     public SeatHoldResponse holdSeat(
             @PathVariable @Positive Long id,
             @PathVariable @NotBlank String seatLabel,
-            @Valid @RequestBody SeatHoldRequest request
+            Principal principal
     ) {
-        return seatService.holdSeat(id, seatLabel, request.userId());
+        return seatService.holdSeat(id, seatLabel, Long.valueOf(principal.getName()));
     }
 
     @DeleteMapping("/{id}/seats/{seatLabel}/hold")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Release a user's seat hold; absent holds are already released")
+    @Operation(summary = "Release the signed-in user's seat hold",
+            description = "Absent holds are already released.")
     public void releaseSeatHold(
             @PathVariable @Positive Long id,
             @PathVariable @NotBlank String seatLabel,
-            @RequestParam @Positive Long userId
+            Principal principal
     ) {
-        seatService.releaseSeatHold(id, seatLabel, userId);
+        seatService.releaseSeatHold(id, seatLabel, Long.valueOf(principal.getName()));
     }
 
     private Screening toEntity(ScreeningRequest request) {

@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.*;
 import com.rayan.cinemaapi.repository.*;
@@ -72,6 +73,7 @@ class BookingFlowTests {
     @Autowired private ScreeningRepository screenings;
     @Autowired private SeatRepository seats;
     @Autowired private UserRepository users;
+    @Autowired private UserService userService;
     @Autowired private RedisTemplate<String, String> redisTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private EntityManager entityManager;
@@ -82,8 +84,12 @@ class BookingFlowTests {
     private Long userId;
     private Long otherUserId;
 
+    private ApiTestSession client;
+    private ApiTestSession otherClient;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        String password = "test-password";
         transactions = new TransactionTemplate(transactionManager);
         transactions.executeWithoutResult(status -> {
             var movie = movies.save(TestDataFactory.createMovie());
@@ -92,11 +98,13 @@ class BookingFlowTests {
             roomId = room.getId();
             screeningId = screenings.save(TestDataFactory.createScreening(movie, room)).getId();
             entityManager.persist(TestDataFactory.createSeat(room, "A1"));
-            userId = users.save(TestDataFactory.createUser()).getId();
+            userId = userService.createUser(TestDataFactory.createUser(), password).getId();
             var other = TestDataFactory.createUser();
             other.setEmail("other@example.com");
-            otherUserId = users.save(other).getId();
+            otherUserId = userService.createUser(other, password).getId();
         });
+        client = ApiTestSession.signIn(mockMvc, users.findById(userId).orElseThrow(), password);
+        otherClient = ApiTestSession.signIn(mockMvc, users.findById(otherUserId).orElseThrow(), password);
     }
 
     @AfterEach
@@ -119,45 +127,49 @@ class BookingFlowTests {
     @Test
     void availableToHeldToBooked_commitsThenCleansHold() throws Exception {
         assertAvailability("AVAILABLE");
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         assertAvailability("HELD");
 
-        book(userId).andExpect(status().isCreated()).andExpect(jsonPath("$.userId").value(userId));
+        book(client).andExpect(status().isCreated()).andExpect(jsonPath("$.userId").value(userId));
 
         assertEquals(1, bookings.count());
         assertFalse(holds.isHeld(screeningId, "A1"));
         assertAvailability("BOOKED");
-        acquire(otherUserId).andExpect(status().isConflict());
+        acquire(otherClient).andExpect(status().isConflict());
     }
 
     @Test
     void missingHold_isConflict() throws Exception {
-        book(userId).andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409));
+        book(client).andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409));
         assertEquals(0, bookings.count());
     }
 
     @Test
-    void wrongOwner_isConflictAndPreservesHold() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+    void spoofedOwner_isConflictAndPreservesHold() throws Exception {
+        acquire(client).andExpect(status().isCreated());
         Instant expiry = holds.getHoldExpiresAt(screeningId, "A1", userId).orElseThrow();
-        book(otherUserId).andExpect(status().isConflict());
+        mockMvc.perform(post("/api/bookings").with(otherClient::apply).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"screeningId": %d, "seatLabel": "A1", "roomId": %d, "userId": %d}
+                                """.formatted(screeningId, roomId, userId)))
+                .andExpect(status().isConflict());
         assertEquals(0, bookings.count());
         assertEquals(expiry, holds.getHoldExpiresAt(screeningId, "A1", userId).orElseThrow());
     }
 
     @Test
     void expiredHold_isConflict() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         redisTemplate.expire(key(), Duration.ofMillis(50));
         awaitExpiry();
-        book(userId).andExpect(status().isConflict());
+        book(client).andExpect(status().isConflict());
         assertEquals(0, bookings.count());
         assertAvailability("AVAILABLE");
     }
 
     @Test
     void claimedHold_cannotExpireOrBeReleasedBeforeCommit() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         redisTemplate.expire(key(), Duration.ofSeconds(1));
         transactions.executeWithoutResult(status -> {
             bookingService.createBooking(request(userId));
@@ -178,7 +190,7 @@ class BookingFlowTests {
 
     @Test
     void rollback_restoresOriginalHoldWithoutRenewingIt() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         Instant expiry = holds.getHoldExpiresAt(screeningId, "A1", userId).orElseThrow();
         transactions.executeWithoutResult(status -> {
             bookingService.createBooking(request(userId));
@@ -191,14 +203,14 @@ class BookingFlowTests {
 
     @Test
     void databaseFailureAfterInsert_rollsBackAndRestoresHold() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doAnswer(invocation -> {
             entityManager.persist(invocation.getArgument(0, Booking.class));
             entityManager.flush();
             throw new DataIntegrityViolationException("Simulated failure after SQL insert");
         }).when(bookings).saveAndFlush(any(Booking.class));
 
-        book(userId).andExpect(status().isConflict());
+        book(client).andExpect(status().isConflict());
         assertEquals(0, bookings.count());
         assertTrue(holds.isHeldByUser(screeningId, "A1", userId));
     }
@@ -210,14 +222,14 @@ class BookingFlowTests {
         // Bypass the friendly precheck to exercise the actual PostgreSQL constraint.
         doReturn(false).when(bookings).existsByScreeningAndSeat(screeningId, "A1", roomId);
 
-        book(userId).andExpect(status().isConflict());
+        book(client).andExpect(status().isConflict());
         assertEquals(1, bookings.count());
         assertTrue(holds.isHeldByUser(screeningId, "A1", userId));
     }
 
     @Test
     void failureAtCommit_rollsBackAndRestoresHold() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         assertThrows(IllegalStateException.class, () -> transactions.executeWithoutResult(status -> {
             bookingService.createBooking(request(userId));
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -232,13 +244,13 @@ class BookingFlowTests {
 
     @Test
     void concurrentBookings_onlyOwnerSucceedsOnce() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(3)) {
-            List<Future<Integer>> results = List.of(userId, userId, otherUserId).stream()
-                    .map(id -> executor.submit(() -> {
+            List<Future<Integer>> results = List.of(client, client, otherClient).stream()
+                    .map(session -> executor.submit(() -> {
                         assertTrue(start.await(5, TimeUnit.SECONDS));
-                        return book(id).andReturn().getResponse().getStatus();
+                        return book(session).andReturn().getResponse().getStatus();
                     })).toList();
             start.countDown();
             int successes = 0;
@@ -256,7 +268,7 @@ class BookingFlowTests {
 
     @Test
     void releaseRequest_waitsForConfirmationTransaction() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         CountDownLatch ready = new CountDownLatch(1);
         try (var executor = Executors.newSingleThreadExecutor()) {
             Future<?>[] release = new Future<?>[1];
@@ -281,94 +293,94 @@ class BookingFlowTests {
 
     @Test
     void redisFailureBeforeClaim_returns503WithoutBooking() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doThrow(redisFailure()).when(holds).getHoldExpiresAt(screeningId, "A1", userId);
-        book(userId).andExpect(status().isServiceUnavailable());
+        book(client).andExpect(status().isServiceUnavailable());
         assertEquals(0, bookings.count());
         assertTrue(holds.isHeldByUser(screeningId, "A1", userId));
     }
 
     @Test
     void redisTimeoutBeforeClaim_returns503WithoutBooking() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doThrow(new QueryTimeoutException("Redis command timed out",
                 new RedisCommandTimeoutException("Simulated Redis timeout")))
                 .when(holds).getHoldExpiresAt(screeningId, "A1", userId);
 
-        book(userId).andExpect(status().isServiceUnavailable());
+        book(client).andExpect(status().isServiceUnavailable());
         assertEquals(0, bookings.count());
         assertTrue(holds.isHeldByUser(screeningId, "A1", userId));
     }
 
     @Test
     void lostRedisClaimResponse_isRecoveredOnRetry() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doAnswer(invocation -> {
             invocation.callRealMethod();
             throw redisFailure();
         }).when(holds).claimForBooking(screeningId, "A1", userId);
-        book(userId).andExpect(status().isServiceUnavailable());
+        book(client).andExpect(status().isServiceUnavailable());
         assertEquals(0, bookings.count());
         assertEquals(-1L, redisTemplate.getExpire(key(), TimeUnit.MILLISECONDS));
 
         reset(holds);
-        book(userId).andExpect(status().isCreated());
+        book(client).andExpect(status().isCreated());
         assertFalse(holds.isHeld(screeningId, "A1"));
     }
 
     @Test
     void redisFailureBeforeCommit_rollsBackBooking() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doThrow(redisFailure()).when(holds).verifyBookingHold(eq(screeningId), eq("A1"), anyString());
-        book(userId).andExpect(status().isServiceUnavailable());
+        book(client).andExpect(status().isServiceUnavailable());
         assertEquals(0, bookings.count());
         assertTrue(holds.isHeldByUser(screeningId, "A1", userId));
     }
 
     @Test
     void holdExpiresBetweenValidationAndClaim_isConflict() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doAnswer(invocation -> {
             Object expiry = invocation.callRealMethod();
             redisTemplate.expireAt(key(), Instant.EPOCH);
             return expiry;
         }).when(holds).getHoldExpiresAt(screeningId, "A1", userId);
 
-        book(userId).andExpect(status().isConflict());
+        book(client).andExpect(status().isConflict());
         assertEquals(0, bookings.count());
         assertFalse(holds.isHeld(screeningId, "A1"));
     }
 
     @Test
     void unexpectedRedisReplacementBeforeCommit_isDetectedAndPreserved() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doAnswer(invocation -> {
             redisTemplate.opsForValue().set(key(), otherUserId.toString(), Duration.ofSeconds(30));
             return invocation.callRealMethod();
         }).when(holds).verifyBookingHold(eq(screeningId), eq("A1"), anyString());
 
-        book(userId).andExpect(status().isConflict());
+        book(client).andExpect(status().isConflict());
         assertEquals(0, bookings.count());
         assertTrue(holds.isHeldByUser(screeningId, "A1", otherUserId));
     }
 
     @Test
     void cleanupFailureAfterCommit_keepsSuccessfulResponseAndRecoversFromDatabase() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         doThrow(redisFailure()).when(holds).completeBookingHold(eq(screeningId), eq("A1"), anyString(), eq(true));
-        book(userId).andExpect(status().isCreated());
+        book(client).andExpect(status().isCreated());
         assertEquals(1, bookings.count());
         assertAvailability("BOOKED");
         assertEquals(-1L, redisTemplate.getExpire(key(), TimeUnit.MILLISECONDS));
 
         reset(holds);
-        acquire(otherUserId).andExpect(status().isConflict());
+        acquire(otherClient).andExpect(status().isConflict());
         assertFalse(holds.isHeld(screeningId, "A1"));
     }
 
     @Test
     void cleanupFailureAfterRollback_restoresOriginalExpiryOnRetry() throws Exception {
-        acquire(userId).andExpect(status().isCreated());
+        acquire(client).andExpect(status().isCreated());
         Instant expiry = holds.getHoldExpiresAt(screeningId, "A1", userId).orElseThrow();
         doThrow(redisFailure()).when(holds).completeBookingHold(eq(screeningId), eq("A1"), anyString(), eq(false));
         transactions.executeWithoutResult(status -> {
@@ -379,7 +391,7 @@ class BookingFlowTests {
         assertEquals(-1L, redisTemplate.getExpire(key(), TimeUnit.MILLISECONDS));
 
         reset(holds);
-        acquire(otherUserId).andExpect(status().isConflict());
+        acquire(otherClient).andExpect(status().isConflict());
         assertEquals(expiry, holds.getHoldExpiresAt(screeningId, "A1", userId).orElseThrow());
     }
 
@@ -393,15 +405,13 @@ class BookingFlowTests {
         return TestDataFactory.createBooking(screening, user, seat);
     }
 
-    private ResultActions acquire(Long ownerId) throws Exception {
-        return mockMvc.perform(post("/api/screenings/{id}/seats/A1/hold", screeningId)
-                .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":%d}".formatted(ownerId)));
+    private ResultActions acquire(ApiTestSession session) throws Exception {
+        return mockMvc.perform(post("/api/screenings/{id}/seats/A1/hold", screeningId).with(session::apply));
     }
 
-    private ResultActions book(Long ownerId) throws Exception {
-        return mockMvc.perform(post("/api/bookings").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"screeningId\":%d,\"userId\":%d,\"seatLabel\":\"A1\",\"roomId\":%d}"
-                        .formatted(screeningId, ownerId, roomId)));
+    private ResultActions book(ApiTestSession session) throws Exception {
+        return mockMvc.perform(post("/api/bookings").with(session::apply).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"screeningId\":%d,\"seatLabel\":\"A1\",\"roomId\":%d}".formatted(screeningId, roomId)));
     }
 
     private void assertAvailability(String expected) throws Exception {

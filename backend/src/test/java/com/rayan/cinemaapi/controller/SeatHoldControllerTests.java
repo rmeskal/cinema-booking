@@ -1,6 +1,7 @@
 package com.rayan.cinemaapi.controller;
 
 import com.jayway.jsonpath.JsonPath;
+import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Screening;
 import com.rayan.cinemaapi.entity.Seat;
@@ -12,6 +13,7 @@ import com.rayan.cinemaapi.repository.RoomTypeRepository;
 import com.rayan.cinemaapi.repository.ScreeningRepository;
 import com.rayan.cinemaapi.repository.UserRepository;
 import com.rayan.cinemaapi.service.SeatHoldService;
+import com.rayan.cinemaapi.service.UserService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,18 +91,27 @@ class SeatHoldControllerTests {
     private User user;
     private User otherUser;
 
+    @Autowired
+    private UserService userService;
+
+    private ApiTestSession client;
+    private ApiTestSession otherClient;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         var movie = movieRepository.save(TestDataFactory.createMovie());
         var roomType = roomTypeRepository.save(TestDataFactory.createRoomType());
         var room = roomRepository.save(TestDataFactory.createRoom(roomType));
         screening = screeningRepository.save(TestDataFactory.createScreening(movie, room));
         seat = TestDataFactory.createSeat(room, "A1");
         entityManager.persist(seat);
-        user = userRepository.save(TestDataFactory.createUser());
+        String password = "test-password";
+        user = userService.createUser(TestDataFactory.createUser(), password);
+        client = ApiTestSession.signIn(mockMvc, user, password);
         otherUser = TestDataFactory.createUser();
         otherUser.setEmail("other@example.com");
-        otherUser = userRepository.save(otherUser);
+        otherUser = userService.createUser(otherUser, password);
+        otherClient = ApiTestSession.signIn(mockMvc, otherUser, password);
     }
 
     @AfterEach
@@ -115,7 +126,7 @@ class SeatHoldControllerTests {
     void holdSeat_returnsCreatedWithActualRedisExpiry() throws Exception {
         Instant before = redisNow();
 
-        String response = acquire(screening.getId(), "A1", user.getId())
+        String response = acquire(screening.getId(), "A1", client)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.screeningId").value(screening.getId()))
                 .andExpect(jsonPath("$.roomId").value(screening.getRoom().getId()))
@@ -133,10 +144,10 @@ class SeatHoldControllerTests {
 
     @Test
     void holdSeat_rejectsAnotherUserWithoutChangingOwnerOrExpiry() throws Exception {
-        acquire(screening.getId(), "A1", user.getId()).andExpect(status().isCreated());
+        acquire(screening.getId(), "A1", client).andExpect(status().isCreated());
         Instant expiresAt = seatHoldService.getHoldExpiresAt(screening.getId(), "A1", user.getId()).orElseThrow();
 
-        acquire(screening.getId(), "A1", otherUser.getId())
+        acquire(screening.getId(), "A1", otherClient)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value(containsString("already held")));
@@ -147,11 +158,11 @@ class SeatHoldControllerTests {
 
     @Test
     void holdSeat_repeatedRequestByOwnerDoesNotRenewExpiry() throws Exception {
-        acquire(screening.getId(), "A1", user.getId()).andExpect(status().isCreated());
+        acquire(screening.getId(), "A1", client).andExpect(status().isCreated());
         assertTrue(redisTemplate.expire(key(), Duration.ofSeconds(5)));
         Instant expiresAt = seatHoldService.getHoldExpiresAt(screening.getId(), "A1", user.getId()).orElseThrow();
 
-        acquire(screening.getId(), "A1", user.getId()).andExpect(status().isConflict());
+        acquire(screening.getId(), "A1", client).andExpect(status().isConflict());
 
         assertEquals(expiresAt, seatHoldService.getHoldExpiresAt(screening.getId(), "A1", user.getId()).orElseThrow());
     }
@@ -160,7 +171,7 @@ class SeatHoldControllerTests {
     void holdSeat_rejectsBookedSeat() throws Exception {
         bookingRepository.save(TestDataFactory.createBooking(screening, user, seat));
 
-        acquire(screening.getId(), "A1", otherUser.getId())
+        acquire(screening.getId(), "A1", otherClient)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(containsString("already booked")));
 
@@ -174,28 +185,29 @@ class SeatHoldControllerTests {
         bookingRepository.save(TestDataFactory.createBooking(screening, user, seat));
         assertTrue(seatHoldService.holdSeat(screening.getId(), "A1", user.getId()));
 
-        acquire(second.getId(), "A1", otherUser.getId()).andExpect(status().isCreated());
-        release(second.getId(), "A1", otherUser.getId()).andExpect(status().isNoContent());
+        acquire(second.getId(), "A1", otherClient).andExpect(status().isCreated());
+        release(second.getId(), "A1", otherClient).andExpect(status().isNoContent());
 
         assertTrue(seatHoldService.isHeldByUser(screening.getId(), "A1", user.getId()));
     }
 
     @Test
     void releaseSeat_removesHoldAndRepeatedReleaseSucceeds() throws Exception {
-        acquire(screening.getId(), "A1", user.getId()).andExpect(status().isCreated());
+        acquire(screening.getId(), "A1", client).andExpect(status().isCreated());
 
-        release(screening.getId(), "A1", user.getId()).andExpect(status().isNoContent());
-        release(screening.getId(), "A1", user.getId()).andExpect(status().isNoContent());
+        release(screening.getId(), "A1", client).andExpect(status().isNoContent());
+        release(screening.getId(), "A1", client).andExpect(status().isNoContent());
 
         assertFalse(seatHoldService.isHeld(screening.getId(), "A1"));
-        acquire(screening.getId(), "A1", otherUser.getId()).andExpect(status().isCreated());
+        acquire(screening.getId(), "A1", otherClient).andExpect(status().isCreated());
     }
 
     @Test
     void releaseSeat_rejectsWrongOwnerAndPreservesHold() throws Exception {
-        acquire(screening.getId(), "A1", user.getId()).andExpect(status().isCreated());
+        acquire(screening.getId(), "A1", client).andExpect(status().isCreated());
 
-        release(screening.getId(), "A1", otherUser.getId())
+        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1").with(otherClient::apply)
+                        .param("userId", user.getId().toString()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value(containsString("another user")));
@@ -205,7 +217,7 @@ class SeatHoldControllerTests {
 
     @Test
     void expiredHold_canBeReleasedOrReacquiredWithoutDeletingNewOwnersHold() throws Exception {
-        acquire(screening.getId(), "A1", user.getId()).andExpect(status().isCreated());
+        acquire(screening.getId(), "A1", client).andExpect(status().isCreated());
         assertTrue(redisTemplate.expire(key(), Duration.ofMillis(100)));
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         while (seatHoldService.isHeld(screening.getId(), "A1") && System.nanoTime() < deadline) {
@@ -213,32 +225,33 @@ class SeatHoldControllerTests {
         }
         assertFalse(seatHoldService.isHeld(screening.getId(), "A1"));
 
-        release(screening.getId(), "A1", user.getId()).andExpect(status().isNoContent());
-        acquire(screening.getId(), "A1", otherUser.getId()).andExpect(status().isCreated());
-        release(screening.getId(), "A1", user.getId()).andExpect(status().isConflict());
+        release(screening.getId(), "A1", client).andExpect(status().isNoContent());
+        acquire(screening.getId(), "A1", otherClient).andExpect(status().isCreated());
+        release(screening.getId(), "A1", client).andExpect(status().isConflict());
 
         assertTrue(seatHoldService.isHeldByUser(screening.getId(), "A1", otherUser.getId()));
     }
 
     @Test
     void holdEndpoints_rejectUnknownScreening() throws Exception {
-        acquire(999999L, "A1", user.getId()).andExpect(status().isNotFound())
+        acquire(999999L, "A1", client).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
-        release(999999L, "A1", user.getId()).andExpect(status().isNotFound());
+        release(999999L, "A1", client).andExpect(status().isNotFound());
     }
 
     @Test
-    void holdEndpoints_rejectUnknownUser() throws Exception {
-        acquire(screening.getId(), "A1", 999999L).andExpect(status().isNotFound())
+    void holdEndpoints_rejectDeletedSessionUser() throws Exception {
+        userRepository.delete(user);
+        acquire(screening.getId(), "A1", client).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value(containsString("User")));
-        release(screening.getId(), "A1", 999999L).andExpect(status().isNotFound());
+        release(screening.getId(), "A1", client).andExpect(status().isNotFound());
         assertFalse(seatHoldService.isHeld(screening.getId(), "A1"));
     }
 
     @Test
     void holdEndpoints_rejectUnknownSeat() throws Exception {
-        acquire(screening.getId(), "Z99", user.getId()).andExpect(status().isNotFound());
-        release(screening.getId(), "Z99", user.getId()).andExpect(status().isNotFound());
+        acquire(screening.getId(), "Z99", client).andExpect(status().isNotFound());
+        release(screening.getId(), "Z99", client).andExpect(status().isNotFound());
         assertFalse(seatHoldService.isHeld(screening.getId(), "Z99"));
     }
 
@@ -247,57 +260,56 @@ class SeatHoldControllerTests {
         var otherRoom = roomRepository.save(TestDataFactory.createRoom("Other room", screening.getRoom().getRoomType()));
         entityManager.persist(TestDataFactory.createSeat(otherRoom, "B1"));
 
-        acquire(screening.getId(), "B1", user.getId()).andExpect(status().isNotFound())
+        acquire(screening.getId(), "B1", client).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value(containsString("Seat")));
-        release(screening.getId(), "B1", user.getId()).andExpect(status().isNotFound());
+        release(screening.getId(), "B1", client).andExpect(status().isNotFound());
 
         assertFalse(seatHoldService.isHeld(screening.getId(), "B1"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"{}", "{\"userId\":null}", "{\"userId\":0}", "{\"userId\":-1}",
-            "{\"userId\":\"invalid\"}", "not-json"})
-    void holdSeat_rejectsInvalidBody(String body) throws Exception {
-        mockMvc.perform(post(HOLD_URL, screening.getId(), "A1")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
-        assertFalse(seatHoldService.isHeld(screening.getId(), "A1"));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"0", "-1", "invalid"})
-    void releaseSeat_rejectsInvalidUserId(String userId) throws Exception {
-        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1").param("userId", userId))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
+    @Test
+    void holdEndpoints_requireAuthentication() throws Exception {
+        var anonymous = ApiTestSession.anonymous(mockMvc);
+        acquire(screening.getId(), "A1", anonymous).andExpect(status().isUnauthorized());
+        release(screening.getId(), "A1", anonymous).andExpect(status().isUnauthorized());
     }
 
     @Test
-    void releaseSeat_requiresUserId() throws Exception {
-        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
+    void holdEndpoints_requireCsrf() throws Exception {
+        mockMvc.perform(post(HOLD_URL, screening.getId(), "A1").session(client.session()))
+                .andExpect(status().isForbidden());
+        acquire(screening.getId(), "A1", client).andExpect(status().isCreated());
+        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1").session(client.session()))
+                .andExpect(status().isForbidden());
+        assertTrue(seatHoldService.isHeldByUser(screening.getId(), "A1", user.getId()));
+    }
+
+    @Test
+    void holdSeat_usesSessionOwnerEvenIfBodySuppliesAnotherUserId() throws Exception {
+        mockMvc.perform(post(HOLD_URL, screening.getId(), "A1").with(client::apply)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":%d}".formatted(otherUser.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(user.getId()));
+        assertTrue(seatHoldService.isHeldByUser(screening.getId(), "A1", user.getId()));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "invalid"})
     void holdEndpoints_rejectInvalidScreeningId(String id) throws Exception {
-        mockMvc.perform(post(HOLD_URL, id, "A1").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":%d}".formatted(user.getId())))
+        mockMvc.perform(post(HOLD_URL, id, "A1").with(client::apply))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
-        mockMvc.perform(delete(HOLD_URL, id, "A1").param("userId", user.getId().toString()))
+        mockMvc.perform(delete(HOLD_URL, id, "A1").with(client::apply))
                 .andExpect(status().isBadRequest());
     }
 
-    private ResultActions acquire(Long screeningId, String seatLabel, Long userId) throws Exception {
-        return mockMvc.perform(post(HOLD_URL, screeningId, seatLabel).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"userId\":%d}".formatted(userId)));
+    private ResultActions acquire(Long screeningId, String seatLabel, ApiTestSession session) throws Exception {
+        return mockMvc.perform(post(HOLD_URL, screeningId, seatLabel).with(session::apply));
     }
 
-    private ResultActions release(Long screeningId, String seatLabel, Long userId) throws Exception {
-        return mockMvc.perform(delete(HOLD_URL, screeningId, seatLabel).param("userId", userId.toString()));
+    private ResultActions release(Long screeningId, String seatLabel, ApiTestSession session) throws Exception {
+        return mockMvc.perform(delete(HOLD_URL, screeningId, seatLabel).with(session::apply));
     }
 
     private String key() {
