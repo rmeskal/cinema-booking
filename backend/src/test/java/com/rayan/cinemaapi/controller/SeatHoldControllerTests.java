@@ -1,6 +1,7 @@
 package com.rayan.cinemaapi.controller;
 
 import com.jayway.jsonpath.JsonPath;
+import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Screening;
 import com.rayan.cinemaapi.entity.Seat;
@@ -89,8 +90,11 @@ class SeatHoldControllerTests {
     private User user;
     private User otherUser;
 
+    private ApiTestSession client;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        client = ApiTestSession.anonymous(mockMvc);
         var movie = movieRepository.save(TestDataFactory.createMovie());
         var roomType = roomTypeRepository.save(TestDataFactory.createRoomType());
         var room = roomRepository.save(TestDataFactory.createRoom(roomType));
@@ -258,7 +262,7 @@ class SeatHoldControllerTests {
     @ValueSource(strings = {"{}", "{\"userId\":null}", "{\"userId\":0}", "{\"userId\":-1}",
             "{\"userId\":\"invalid\"}", "not-json"})
     void holdSeat_rejectsInvalidBody(String body) throws Exception {
-        mockMvc.perform(post(HOLD_URL, screening.getId(), "A1")
+        mockMvc.perform(post(HOLD_URL, screening.getId(), "A1").with(client::apply)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
@@ -268,14 +272,14 @@ class SeatHoldControllerTests {
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "invalid"})
     void releaseSeat_rejectsInvalidUserId(String userId) throws Exception {
-        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1").param("userId", userId))
+        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1").with(client::apply).param("userId", userId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
     }
 
     @Test
     void releaseSeat_requiresUserId() throws Exception {
-        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1"))
+        mockMvc.perform(delete(HOLD_URL, screening.getId(), "A1").with(client::apply))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
     }
@@ -283,21 +287,21 @@ class SeatHoldControllerTests {
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "invalid"})
     void holdEndpoints_rejectInvalidScreeningId(String id) throws Exception {
-        mockMvc.perform(post(HOLD_URL, id, "A1").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post(HOLD_URL, id, "A1").with(client::apply).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userId\":%d}".formatted(user.getId())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
-        mockMvc.perform(delete(HOLD_URL, id, "A1").param("userId", user.getId().toString()))
+        mockMvc.perform(delete(HOLD_URL, id, "A1").with(client::apply).param("userId", user.getId().toString()))
                 .andExpect(status().isBadRequest());
     }
 
     private ResultActions acquire(Long screeningId, String seatLabel, Long userId) throws Exception {
-        return mockMvc.perform(post(HOLD_URL, screeningId, seatLabel).contentType(MediaType.APPLICATION_JSON)
+        return mockMvc.perform(post(HOLD_URL, screeningId, seatLabel).with(client::apply).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":%d}".formatted(userId)));
     }
 
     private ResultActions release(Long screeningId, String seatLabel, Long userId) throws Exception {
-        return mockMvc.perform(delete(HOLD_URL, screeningId, seatLabel).param("userId", userId.toString()));
+        return mockMvc.perform(delete(HOLD_URL, screeningId, seatLabel).with(client::apply).param("userId", userId.toString()));
     }
 
     private String key() {

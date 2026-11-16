@@ -66,10 +66,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .securityMatcher("/api/**")
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
-                )
-                .csrf(AbstractHttpConfigurer::disable)
+                        .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+                        .requestMatchers("/api/users", "/api/users/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/movies", "/api/screenings", "/api/rooms", "/api/room-types")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/movies/{id}", "/api/screenings/{id}", "/api/rooms/{id}", "/api/room-types/{id}")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/movies/{id}", "/api/screenings/{id}", "/api/rooms/{id}", "/api/room-types/{id}")
+                        .hasRole("ADMIN")
+                        .anyRequest().permitAll())
+                .requestCache(AbstractHttpConfigurer::disable)
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 // Prevent the default /logout from bypassing the auth chain's CSRF protection.
                 .logout(AbstractHttpConfigurer::disable);
 

@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.controller;
 
+import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Movie;
 import com.rayan.cinemaapi.entity.Room;
@@ -9,11 +10,14 @@ import com.rayan.cinemaapi.repository.MovieRepository;
 import com.rayan.cinemaapi.repository.RoomRepository;
 import com.rayan.cinemaapi.repository.RoomTypeRepository;
 import com.rayan.cinemaapi.repository.ScreeningRepository;
+import com.rayan.cinemaapi.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +52,19 @@ class ScreeningControllerTests {
 
     @Autowired
     private ScreeningRepository screeningRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private ApiTestSession admin;
+
+    @BeforeEach
+    void signInAsAdmin() throws Exception {
+        admin = ApiTestSession.admin(mockMvc, userRepository, passwordEncoder);
+    }
 
     private Movie saveMovie() {
         return movieRepository.save(TestDataFactory.createMovie());
@@ -131,7 +148,7 @@ class ScreeningControllerTests {
         Movie movie = saveMovie();
         Room room = saveRoom();
 
-        mockMvc.perform(post("/api/screenings")
+        mockMvc.perform(post("/api/screenings").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -162,7 +179,7 @@ class ScreeningControllerTests {
             throws Exception {
         Room room = saveRoom();
 
-        mockMvc.perform(post("/api/screenings")
+        mockMvc.perform(post("/api/screenings").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -180,7 +197,7 @@ class ScreeningControllerTests {
             throws Exception {
         Movie movie = saveMovie();
 
-        mockMvc.perform(post("/api/screenings")
+        mockMvc.perform(post("/api/screenings").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -205,7 +222,7 @@ class ScreeningControllerTests {
                 LocalDateTime.of(2026, 8, 25, 19, 0)
         );
 
-        mockMvc.perform(post("/api/screenings")
+        mockMvc.perform(post("/api/screenings").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -233,7 +250,7 @@ class ScreeningControllerTests {
                 LocalDateTime.of(2026, 8, 25, 19, 0)
         );
 
-        mockMvc.perform(post("/api/screenings")
+        mockMvc.perform(post("/api/screenings").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -254,7 +271,7 @@ class ScreeningControllerTests {
     @Test
     void createScreening_returns400WhenRequestIsInvalid()
             throws Exception {
-        mockMvc.perform(post("/api/screenings")
+        mockMvc.perform(post("/api/screenings").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -297,7 +314,7 @@ class ScreeningControllerTests {
                 LocalDateTime.of(2026, 8, 25, 18, 0)
         );
 
-        mockMvc.perform(put("/api/screenings/{id}", screening.getId())
+        mockMvc.perform(put("/api/screenings/{id}", screening.getId()).with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -337,7 +354,7 @@ class ScreeningControllerTests {
         Movie movie = saveMovie();
         Room room = saveRoom();
 
-        mockMvc.perform(put("/api/screenings/999999")
+        mockMvc.perform(put("/api/screenings/999999").with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -365,7 +382,7 @@ class ScreeningControllerTests {
                 LocalDateTime.of(2026, 8, 25, 18, 0)
         );
 
-        mockMvc.perform(put("/api/screenings/{id}", screening.getId())
+        mockMvc.perform(put("/api/screenings/{id}", screening.getId()).with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -390,7 +407,7 @@ class ScreeningControllerTests {
                 LocalDateTime.of(2026, 8, 25, 18, 0)
         );
 
-        mockMvc.perform(put("/api/screenings/{id}", screening.getId())
+        mockMvc.perform(put("/api/screenings/{id}", screening.getId()).with(admin::apply)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -425,7 +442,7 @@ class ScreeningControllerTests {
                         put(
                                 "/api/screenings/{id}",
                                 screeningToUpdate.getId()
-                        )
+                        ).with(admin::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -464,7 +481,7 @@ class ScreeningControllerTests {
                         put(
                                 "/api/screenings/{id}",
                                 screeningToUpdate.getId()
-                        )
+                        ).with(admin::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -498,7 +515,7 @@ class ScreeningControllerTests {
         );
 
         mockMvc.perform(
-                        delete("/api/screenings/{id}", screening.getId())
+                        delete("/api/screenings/{id}", screening.getId()).with(admin::apply)
                 )
                 .andExpect(status().isNoContent());
 
@@ -510,7 +527,7 @@ class ScreeningControllerTests {
     @Test
     void deleteScreening_returns404WhenNotFound()
             throws Exception {
-        mockMvc.perform(delete("/api/screenings/999999"))
+        mockMvc.perform(delete("/api/screenings/999999").with(admin::apply))
                 .andExpect(status().isNotFound());
     }
 }

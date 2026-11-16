@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.controller;
 
+import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Booking;
 import com.rayan.cinemaapi.entity.Movie;
@@ -17,6 +18,7 @@ import com.rayan.cinemaapi.repository.SeatRepository;
 import com.rayan.cinemaapi.repository.UserRepository;
 import com.rayan.cinemaapi.service.SeatHoldService;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -73,6 +75,13 @@ class BookingControllerTests {
 
     @Autowired
     private UserRepository userRepository;
+
+    private ApiTestSession client;
+
+    @BeforeEach
+    void fetchCsrf() throws Exception {
+        client = ApiTestSession.anonymous(mockMvc);
+    }
 
     private Movie saveMovie() {
         return movieRepository.save(
@@ -272,7 +281,7 @@ class BookingControllerTests {
         Seat seat = saveSeat(room, "A1");
 
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -329,7 +338,7 @@ class BookingControllerTests {
         saveSeat(room, "A1");
 
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -366,7 +375,7 @@ class BookingControllerTests {
         saveSeat(room, "A1");
 
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -402,7 +411,7 @@ class BookingControllerTests {
         );
 
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -451,7 +460,7 @@ class BookingControllerTests {
         saveSeat(seatRoom, "A1");
 
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -503,7 +512,7 @@ class BookingControllerTests {
         );
 
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -525,7 +534,7 @@ class BookingControllerTests {
     void createBooking_returns400WhenRequestIsInvalid()
             throws Exception {
         mockMvc.perform(
-                        post("/api/bookings")
+                        post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
@@ -569,7 +578,7 @@ class BookingControllerTests {
                         delete(
                                 "/api/bookings/{id}",
                                 booking.getId()
-                        )
+                        ).with(client::apply)
                 )
                 .andExpect(status().isNoContent());
 
@@ -583,7 +592,7 @@ class BookingControllerTests {
     @Test
     void deleteBooking_returns404WhenNotFound()
             throws Exception {
-        mockMvc.perform(delete("/api/bookings/999999"))
+        mockMvc.perform(delete("/api/bookings/999999").with(client::apply))
                 .andExpect(status().isNotFound());
     }
 }

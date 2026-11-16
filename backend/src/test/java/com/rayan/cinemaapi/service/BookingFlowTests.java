@@ -1,5 +1,6 @@
 package com.rayan.cinemaapi.service;
 
+import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.*;
 import com.rayan.cinemaapi.repository.*;
@@ -82,8 +83,11 @@ class BookingFlowTests {
     private Long userId;
     private Long otherUserId;
 
+    private ApiTestSession client;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        client = ApiTestSession.anonymous(mockMvc);
         transactions = new TransactionTemplate(transactionManager);
         transactions.executeWithoutResult(status -> {
             var movie = movies.save(TestDataFactory.createMovie());
@@ -394,12 +398,12 @@ class BookingFlowTests {
     }
 
     private ResultActions acquire(Long ownerId) throws Exception {
-        return mockMvc.perform(post("/api/screenings/{id}/seats/A1/hold", screeningId)
+        return mockMvc.perform(post("/api/screenings/{id}/seats/A1/hold", screeningId).with(client::apply)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":%d}".formatted(ownerId)));
     }
 
     private ResultActions book(Long ownerId) throws Exception {
-        return mockMvc.perform(post("/api/bookings").contentType(MediaType.APPLICATION_JSON)
+        return mockMvc.perform(post("/api/bookings").with(client::apply).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"screeningId\":%d,\"userId\":%d,\"seatLabel\":\"A1\",\"roomId\":%d}"
                         .formatted(screeningId, ownerId, roomId)));
     }
