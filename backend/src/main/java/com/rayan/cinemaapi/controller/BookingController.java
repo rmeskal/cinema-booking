@@ -12,8 +12,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -28,39 +30,45 @@ public class BookingController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all bookings")
-    public List<BookingResponse> getBookings() {
-        return bookingService.getBookings()
+    @Operation(summary = "List the signed-in user's bookings, or all bookings for admins")
+    public List<BookingResponse> getBookings(Authentication authentication) {
+        return bookingService.getBookings(Long.valueOf(authentication.getName()), isAdmin(authentication))
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a booking by ID")
-    public BookingResponse getBooking(@PathVariable Long id) {
-        return toResponse(bookingService.getBooking(id));
+    @Operation(summary = "Get a booking by ID as its owner or an admin")
+    public BookingResponse getBooking(@PathVariable Long id, Authentication authentication) {
+        return toResponse(bookingService.getBooking(id, Long.valueOf(authentication.getName()), isAdmin(authentication)));
     }
 
     @PostMapping
-    @Operation(summary = "Create a booking")
+    @Operation(summary = "Confirm a booking from the signed-in user's seat hold")
     @ResponseStatus(HttpStatus.CREATED)
     public BookingResponse createBooking(
-            @Valid @RequestBody BookingRequest request
+            @Valid @RequestBody BookingRequest request,
+            Principal principal
     ) {
         return toResponse(
-                bookingService.createBooking(toEntity(request))
+                bookingService.createBooking(toEntity(request, Long.valueOf(principal.getName())))
         );
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a booking")
+    @Operation(summary = "Delete a booking as its owner or an admin")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteBooking(@PathVariable Long id) {
-        bookingService.deleteBooking(id);
+    public void deleteBooking(@PathVariable Long id, Authentication authentication) {
+        bookingService.deleteBooking(id, Long.valueOf(authentication.getName()), isAdmin(authentication));
     }
 
-    private Booking toEntity(BookingRequest request) {
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private Booking toEntity(BookingRequest request, Long userId) {
         Booking booking = new Booking();
 
         Screening screening = new Screening();
@@ -68,7 +76,7 @@ public class BookingController {
         booking.setScreening(screening);
 
         User user = new User();
-        user.setId(request.userId());
+        user.setId(userId);
         booking.setUser(user);
 
         Seat seat = new Seat();

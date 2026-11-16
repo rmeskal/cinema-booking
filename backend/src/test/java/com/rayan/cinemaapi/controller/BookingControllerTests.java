@@ -4,6 +4,7 @@ import com.rayan.cinemaapi.ApiTestSession;
 import com.rayan.cinemaapi.TestDataFactory;
 import com.rayan.cinemaapi.entity.Booking;
 import com.rayan.cinemaapi.entity.Movie;
+import com.rayan.cinemaapi.entity.Role;
 import com.rayan.cinemaapi.entity.Room;
 import com.rayan.cinemaapi.entity.RoomType;
 import com.rayan.cinemaapi.entity.Screening;
@@ -17,6 +18,7 @@ import com.rayan.cinemaapi.repository.ScreeningRepository;
 import com.rayan.cinemaapi.repository.SeatRepository;
 import com.rayan.cinemaapi.repository.UserRepository;
 import com.rayan.cinemaapi.service.SeatHoldService;
+import com.rayan.cinemaapi.service.UserService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -76,11 +80,20 @@ class BookingControllerTests {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private User user;
     private ApiTestSession client;
 
     @BeforeEach
-    void fetchCsrf() throws Exception {
-        client = ApiTestSession.anonymous(mockMvc);
+    void signIn() throws Exception {
+        String password = "test-password";
+        user = userService.createUser(TestDataFactory.createUser(), password);
+        client = ApiTestSession.signIn(mockMvc, user, password);
     }
 
     private Movie saveMovie() {
@@ -126,26 +139,9 @@ class BookingControllerTests {
         );
     }
 
-    private User saveUser() {
-        return userRepository.save(
-                TestDataFactory.createUser()
-        );
-    }
-
-    private User saveUser(
-            String firstName,
-            String lastName,
-            String email
-    ) {
-        return userRepository.save(
-                TestDataFactory.createUser(
-                        firstName,
-                        lastName,
-                        email,
-                        "hashed-password",
-                        com.rayan.cinemaapi.entity.Role.USER
-                )
-        );
+    private User saveOtherUser() {
+        return userRepository.save(TestDataFactory.createUser(
+                "Another", "User", "other@example.com", "hashed-password", Role.USER));
     }
 
     private Seat saveSeat(
@@ -176,10 +172,57 @@ class BookingControllerTests {
     }
 
     @Test
-    void getBookings_returnsBookings() throws Exception {
+    void bookingEndpoints_requireAuthentication() throws Exception {
+        var anonymous = ApiTestSession.anonymous(mockMvc);
+
+        mockMvc.perform(get("/api/bookings")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/bookings/1")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/bookings").with(anonymous::apply)).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/bookings/1").with(anonymous::apply)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void bookingWrites_requireCsrf() throws Exception {
+        mockMvc.perform(post("/api/bookings").session(client.session())).andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/bookings/1").session(client.session())).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void usersCannotReadOrDeleteAnotherUsersBooking() throws Exception {
+        Room room = saveRoom();
+        Screening screening = screeningRepository.save(TestDataFactory.createScreening(saveMovie(), room));
+        Booking booking = saveBooking(screening, saveOtherUser(), saveSeat(room, "A1"));
+
+        mockMvc.perform(get("/api/bookings/{id}", booking.getId()).with(client::apply))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/bookings/{id}", booking.getId()).with(client::apply))
+                .andExpect(status().isForbidden());
+        assertTrue(bookingRepository.existsById(booking.getId()));
+    }
+
+    @Test
+    void adminsCanListReadAndDeleteOtherUsersBookings() throws Exception {
+        var admin = ApiTestSession.admin(mockMvc, userRepository, passwordEncoder);
+        Room room = saveRoom();
+        Screening screening = screeningRepository.save(TestDataFactory.createScreening(saveMovie(), room));
+        Booking booking = saveBooking(screening, user, saveSeat(room, "A1"));
+        saveBooking(screening, saveOtherUser(), saveSeat(room, "A2"));
+
+        mockMvc.perform(get("/api/bookings").with(admin::apply))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)));
+        mockMvc.perform(get("/api/bookings/{id}", booking.getId()).with(admin::apply))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getId()));
+        mockMvc.perform(delete("/api/bookings/{id}", booking.getId()).with(admin::apply))
+                .andExpect(status().isNoContent());
+        assertFalse(bookingRepository.existsById(booking.getId()));
+    }
+
+    @Test
+    void getBookings_returnsOnlyOwnBookings() throws Exception {
         Movie movie = saveMovie();
         Room room = saveRoom();
-        User user = saveUser();
 
         Screening screening = saveScreening(
                 movie,
@@ -195,7 +238,9 @@ class BookingControllerTests {
                 seat
         );
 
-        mockMvc.perform(get("/api/bookings"))
+        saveBooking(screening, saveOtherUser(), saveSeat(room, "A2"));
+
+        mockMvc.perform(get("/api/bookings").with(client::apply))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id")
@@ -213,7 +258,7 @@ class BookingControllerTests {
     @Test
     void getBookings_returnsEmptyListWhenNoBookingsExist()
             throws Exception {
-        mockMvc.perform(get("/api/bookings"))
+        mockMvc.perform(get("/api/bookings").with(client::apply))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -223,7 +268,6 @@ class BookingControllerTests {
             throws Exception {
         Movie movie = saveMovie();
         Room room = saveRoom();
-        User user = saveUser();
 
         Screening screening = saveScreening(
                 movie,
@@ -240,10 +284,7 @@ class BookingControllerTests {
         );
 
         mockMvc.perform(
-                        get(
-                                "/api/bookings/{id}",
-                                booking.getId()
-                        )
+                        get("/api/bookings/{id}", booking.getId()).with(client::apply)
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id")
@@ -261,7 +302,7 @@ class BookingControllerTests {
     @Test
     void getBooking_returns404WhenNotFound()
             throws Exception {
-        mockMvc.perform(get("/api/bookings/999999"))
+        mockMvc.perform(get("/api/bookings/999999").with(client::apply))
                 .andExpect(status().isNotFound());
     }
 
@@ -270,7 +311,6 @@ class BookingControllerTests {
             throws Exception {
         Movie movie = saveMovie();
         Room room = saveRoom();
-        User user = saveUser();
 
         Screening screening = saveScreening(
                 movie,
@@ -286,13 +326,11 @@ class BookingControllerTests {
                                 .content("""
                                         {
                                             "screeningId": %d,
-                                            "userId": %d,
                                             "seatLabel": "A1",
                                             "roomId": %d
                                         }
                                         """.formatted(
                                         screening.getId(),
-                                        user.getId(),
                                         room.getId()
                                 ))
                 )
@@ -334,7 +372,6 @@ class BookingControllerTests {
     void createBooking_returns404WhenScreeningDoesNotExist()
             throws Exception {
         Room room = saveRoom();
-        User user = saveUser();
         saveSeat(room, "A1");
 
         mockMvc.perform(
@@ -343,12 +380,10 @@ class BookingControllerTests {
                                 .content("""
                                         {
                                             "screeningId": 999999,
-                                            "userId": %d,
                                             "seatLabel": "A1",
                                             "roomId": %d
                                         }
                                         """.formatted(
-                                        user.getId(),
                                         room.getId()
                                 ))
                 )
@@ -361,7 +396,7 @@ class BookingControllerTests {
     }
 
     @Test
-    void createBooking_returns404WhenUserDoesNotExist()
+    void createBooking_returns404WhenSessionUserNoLongerExists()
             throws Exception {
         Movie movie = saveMovie();
         Room room = saveRoom();
@@ -374,13 +409,14 @@ class BookingControllerTests {
 
         saveSeat(room, "A1");
 
+        userRepository.delete(user);
+
         mockMvc.perform(
                         post("/api/bookings").with(client::apply)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                         {
                                             "screeningId": %d,
-                                            "userId": 999999,
                                             "seatLabel": "A1",
                                             "roomId": %d
                                         }
@@ -402,7 +438,6 @@ class BookingControllerTests {
             throws Exception {
         Movie movie = saveMovie();
         Room room = saveRoom();
-        User user = saveUser();
 
         Screening screening = saveScreening(
                 movie,
@@ -416,13 +451,11 @@ class BookingControllerTests {
                                 .content("""
                                         {
                                             "screeningId": %d,
-                                            "userId": %d,
                                             "seatLabel": "A1",
                                             "roomId": %d
                                         }
                                         """.formatted(
                                         screening.getId(),
-                                        user.getId(),
                                         room.getId()
                                 ))
                 )
@@ -449,8 +482,6 @@ class BookingControllerTests {
                 "Premium"
         );
 
-        User user = saveUser();
-
         Screening screening = saveScreening(
                 movie,
                 screeningRoom,
@@ -465,13 +496,11 @@ class BookingControllerTests {
                                 .content("""
                                         {
                                             "screeningId": %d,
-                                            "userId": %d,
                                             "seatLabel": "A1",
                                             "roomId": %d
                                         }
                                         """.formatted(
                                         screening.getId(),
-                                        user.getId(),
                                         seatRoom.getId()
                                 ))
                 )
@@ -489,13 +518,7 @@ class BookingControllerTests {
         Movie movie = saveMovie();
         Room room = saveRoom();
 
-        User firstUser = saveUser();
-
-        User secondUser = saveUser(
-                "Another",
-                "User",
-                "another@example.com"
-        );
+        User firstUser = saveOtherUser();
 
         Screening screening = saveScreening(
                 movie,
@@ -517,13 +540,11 @@ class BookingControllerTests {
                                 .content("""
                                         {
                                             "screeningId": %d,
-                                            "userId": %d,
                                             "seatLabel": "A1",
                                             "roomId": %d
                                         }
                                         """.formatted(
                                         screening.getId(),
-                                        secondUser.getId(),
                                         room.getId()
                                 ))
                 )
@@ -539,7 +560,6 @@ class BookingControllerTests {
                                 .content("""
                                         {
                                             "screeningId": null,
-                                            "userId": null,
                                             "seatLabel": "",
                                             "roomId": null
                                         }
@@ -558,7 +578,6 @@ class BookingControllerTests {
             throws Exception {
         Movie movie = saveMovie();
         Room room = saveRoom();
-        User user = saveUser();
 
         Screening screening = saveScreening(
                 movie,

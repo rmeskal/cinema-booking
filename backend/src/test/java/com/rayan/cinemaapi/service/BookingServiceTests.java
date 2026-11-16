@@ -47,11 +47,12 @@ class BookingServiceTests {
                 new Seat()
         );
         booking.setId(1L);
+        booking.getUser().setId(2L);
 
         when(bookingRepository.findById(1L))
                 .thenReturn(Optional.of(booking));
 
-        Booking result = bookingService.getBooking(1L);
+        Booking result = bookingService.getBooking(1L, 2L, false);
 
         assertSame(booking, result);
     }
@@ -63,7 +64,7 @@ class BookingServiceTests {
 
         assertThrows(
                 EntityNotFoundException.class,
-                () -> bookingService.getBooking(1L)
+                () -> bookingService.getBooking(1L, 2L, false)
         );
     }
 
@@ -172,25 +173,26 @@ class BookingServiceTests {
     }
 
     @Test
-    void deleteBooking_deletesBookingById() {
-        when(bookingRepository.existsById(1L))
-                .thenReturn(true);
+    void deleteBooking_deletesOwnedBooking() {
+        var booking = TestDataFactory.createBooking(new Screening(), new User(), new Seat());
+        booking.getUser().setId(2L);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
-        bookingService.deleteBooking(1L);
+        bookingService.deleteBooking(1L, 2L, false);
 
-        verify(bookingRepository).deleteById(1L);
+        verify(bookingRepository).delete(booking);
     }
 
     @Test
     void deleteBooking_throwsExceptionWhenBookingDoesNotExist() {
-        when(bookingRepository.existsById(1L))
-                .thenReturn(false);
+        when(bookingRepository.findById(1L))
+                .thenReturn(Optional.empty());
 
         assertThrows(
                 EntityNotFoundException.class,
-                () -> bookingService.deleteBooking(1L)
+                () -> bookingService.deleteBooking(1L, 2L, false)
         );
 
-        verify(bookingRepository, never()).deleteById(1L);
+        verify(bookingRepository, never()).delete(any());
     }
 }

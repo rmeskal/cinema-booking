@@ -1,6 +1,20 @@
 # Seat holds and booking confirmation
 
-Booking creation requires an active Redis hold owned by the supplied user ID.
+Seat holds and bookings require a signed-in session. For POST and DELETE requests,
+send the CSRF header and token from `GET /api/auth/csrf` with that session.
+
+- `POST /api/screenings/{id}/seats/{seatLabel}/hold` takes no body.
+- `DELETE /api/screenings/{id}/seats/{seatLabel}/hold` takes no query parameters.
+- `POST /api/bookings` takes `screeningId`, `seatLabel` and `roomId` in its JSON body.
+
+The session determines the owner in each case. Releasing another user's hold
+returns HTTP 409 and leaves the hold in place. Seat availability remains public.
+
+`GET /api/bookings` lists the signed-in user's bookings. `GET /api/bookings/{id}`
+and `DELETE /api/bookings/{id}` return HTTP 403 for bookings owned by someone else,
+and HTTP 404 for missing bookings. Admins can list, retrieve and delete any booking.
+
+Booking creation requires an active Redis hold owned by the signed-in user.
 Existing screening, user, seat and room validation still runs first. A missing,
 expired or incorrectly owned hold returns HTTP 409. Redis connection failures
 and timeouts before commit return HTTP 503 without confirming a booking.
@@ -36,8 +50,7 @@ Recovery is request-driven, so an abandoned unbooked marker can appear as HELD
 until the next mutating request for that seat. There is no atomic transaction
 across Redis and PostgreSQL: arbitrary Redis data loss, eviction or direct writes
 outside this protocol cannot have the same guarantees as application operations.
-PostgreSQL remains authoritative for confirmed bookings. Authentication is still
-pending; user IDs are supplied by callers.
+PostgreSQL remains authoritative for confirmed bookings.
 
 Run `./mvnw test` from `backend` with Docker available and the existing PostgreSQL
 test database configured. `BookingFlowTests` commits its fixtures and runs outside

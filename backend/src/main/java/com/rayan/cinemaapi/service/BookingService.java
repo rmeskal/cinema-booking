@@ -10,6 +10,7 @@ import com.rayan.cinemaapi.exception.SeatHoldConflictException;
 import com.rayan.cinemaapi.repository.BookingRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -42,14 +43,18 @@ public class BookingService {
         this.seatHoldService = seatHoldService;
     }
 
-    public List<Booking> getBookings() {
-        return bookingRepository.findAll();
+    public List<Booking> getBookings(Long userId, boolean admin) {
+        return admin ? bookingRepository.findAll() : bookingRepository.findAllByUserId(userId);
     }
 
-    public Booking getBooking(Long id) {
-        return bookingRepository.findById(id).orElseThrow(
+    public Booking getBooking(Long id, Long userId, boolean admin) {
+        Booking booking = bookingRepository.findById(id).orElseThrow(
                 () -> new EntityNotFoundException("Booking", id)
         );
+        if (!admin && !Objects.equals(booking.getUser().getId(), userId)) {
+            throw new AccessDeniedException("Booking belongs to another user.");
+        }
+        return booking;
     }
 
     @Transactional
@@ -91,12 +96,9 @@ public class BookingService {
         return bookingRepository.saveAndFlush(booking);
     }
 
-    public void deleteBooking(Long id) {
-        if (!bookingRepository.existsById(id)) {
-            throw new EntityNotFoundException("Booking", id);
-        }
-
-        bookingRepository.deleteById(id);
+    @Transactional
+    public void deleteBooking(Long id, Long userId, boolean admin) {
+        bookingRepository.delete(getBooking(id, userId, admin));
     }
 
     private void resolveBooking(Booking booking) {

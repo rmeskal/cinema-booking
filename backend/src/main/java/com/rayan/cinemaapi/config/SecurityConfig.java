@@ -70,6 +70,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                         .requestMatchers("/api/users", "/api/users/{id}").hasRole("ADMIN")
+                        .requestMatchers("/api/bookings/**", "/api/screenings/{id}/seats/{seatLabel}/hold")
+                        .authenticated()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/movies", "/api/screenings", "/api/rooms", "/api/room-types")
                         .hasRole("ADMIN")
